@@ -14,12 +14,11 @@ class SvoNodeBase {
   void run();
 
  private:
-  ros::NodeHandle node_handle_;
-  ros::NodeHandle private_node_handle_;
+  std::shared_ptr<rclcpp::Node> nh_;
   svo::PipelineType type_;
 
  public:
-   svo::SvoInterface svo_interface_;
+  std::unique_ptr<svo::SvoInterface> svo_interface_;
 };
 
 }  // namespace svo_ros

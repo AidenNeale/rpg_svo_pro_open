@@ -1,11 +1,27 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(svo_cmake)
 
-find_package(catkin_simple REQUIRED)
-catkin_simple()
+find_package(ament_cmake REQUIRED)
 
-# install all included cmake files
-install(DIRECTORY cmake DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/cmake)
+# Configure environment hook files from templates
+configure_file(
+  cmake/svo_cmake-extras.cmake.develspace.in
+  ${CMAKE_CURRENT_BINARY_DIR}/svo_cmake-extras.cmake
+  @ONLY
+)
 
-cs_install()
-cs_export(CFG_EXTRAS svo_cmake-extras.cmake)
+# Install the generated environment hook
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/svo_cmake-extras.cmake
+  DESTINATION share/${PROJECT_NAME}/cmake
+)
+
+ament_environment_hooks(
+  "${CMAKE_CURRENT_BINARY_DIR}/svo_cmake-extras.cmake"
+)
+
+install(DIRECTORY cmake
+  DESTINATION share/${PROJECT_NAME}/cmake
+)
+
+ament_package()

@@ -1,10 +1,21 @@
+cmake_minimum_required(VERSION 3.8)
 project(vikit_ros)
-cmake_minimum_required(VERSION 2.8.3)
 
-find_package(catkin_simple REQUIRED)
-catkin_simple(ALL_DEPS_REQUIRED)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_BUILD_TYPE Release)
 
-include(SvoSetup)
+find_package(ament_cmake REQUIRED)
+find_package(Eigen3 REQUIRED)
+
+find_package(rclcpp REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+
+find_package(vikit_common REQUIRED)
 
 set(HEADERS
   include/vikit/img_type_conversion.h
@@ -18,8 +29,35 @@ set(SOURCES
   )
 
 # Create vikit library
-cs_add_library(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+target_include_directories(${PROJECT_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(${PROJECT_NAME}
+  rclcpp
+  cv_bridge
+  tf2_ros
+  tf2_geometry_msgs
+  visualization_msgs
+  geometry_msgs
+  sensor_msgs
+  vikit_common
+)
+target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
 
-################################################################################
-cs_install()
-cs_export()
+# Install library and headers
+install(TARGETS ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+install(DIRECTORY include/
+  DESTINATION include
+)
+
+ament_export_dependencies(tf2_ros tf2_geometry_msgs)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_include_directories(include)
+ament_package()

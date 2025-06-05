@@ -1,17 +1,15 @@
 #pragma once
 
 #include <memory>
-#include <nodelet/nodelet.h>
 
 namespace svo {
 
 // forward declarations
 class SvoInterface;
 
-class SvoNodelet : public nodelet::Nodelet
-{
-public:
-  SvoNodelet() = default;
+class SvoNodelet : public rclcpp::Node {
+ public:
+  SvoNodelet(const rclcpp::NodeOptions& options);
   virtual ~SvoNodelet();
 
  private:
@@ -20,4 +18,4 @@ public:
   std::unique_ptr<SvoInterface> svo_interface_;
 };
 
-} // namespace svo
+}  // namespace svo

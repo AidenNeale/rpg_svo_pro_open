@@ -1,10 +1,18 @@
+cmake_minimum_required (VERSION 3.8)
 project(svo_test_utils)
-cmake_minimum_required(VERSION 2.8.3)
 
-find_package(catkin_simple REQUIRED)
-catkin_simple(ALL_DEPS_REQUIRED)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_BUILD_TYPE Release)
 
-include(SvoSetup)
+
+find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
+find_package(OpenCV REQUIRED)
+
+find_package(vikit_common REQUIRED)
+find_package(vikit_cameras REQUIRED)
+find_package(vikit_ros REQUIRED)
+find_package(svo_common REQUIRED)
 
 ################################################################################
 set(HEADERS
@@ -25,8 +33,26 @@ set(SOURCES
   src/point_cloud_generator.cpp
 )
 
-cs_add_library(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+target_include_directories(${PROJECT_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(${PROJECT_NAME} svo_common vikit_common vikit_cameras vikit_ros ament_index_cpp)
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES} yaml-cpp Eigen3::Eigen)
+
 
 ################################################################################
-cs_install()
-cs_export()
+install(TARGETS ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+ament_export_libraries(${PROJECT_NAME})
+ament_export_include_directories(include)
+ament_package()

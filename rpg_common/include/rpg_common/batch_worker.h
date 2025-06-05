@@ -3,46 +3,30 @@
 #include <atomic>
 #include <thread>
 
-#include <glog/logging.h>
-
 #include "rpg_common/threadsafe_queue.h"
 #include "rpg_common/worker_base.h"
 
 namespace rpg_common {
 
 template <typename DataType>
-class BatchWorker : public WorkerBase
-{
+class BatchWorker : public WorkerBase {
  public:
-  BatchWorker() : paused_(true)
- {
-    resume();
- }
+  BatchWorker() : paused_(true) { resume(); }
 
-  virtual ~BatchWorker()
-  {
-    shutdown();
-  }
+  virtual ~BatchWorker() { shutdown(); }
 
-  void addTask(const DataType& item)
-  {
-    queue_.push(item);
-  }
+  void addTask(const DataType& item) { queue_.push(item); }
 
-  virtual void shutdown() override
-  {
-    if (!thread_.joinable())
-    {
+  virtual void shutdown() override {
+    if (!thread_.joinable()) {
       return;
     }
     queue_.shutdown();
     thread_.join();
   }
 
-  virtual void softShutdown() override
-  {
-    if (!thread_.joinable())
-    {
+  virtual void softShutdown() override {
+    if (!thread_.joinable()) {
       return;
     }
     queue_.waitUntilEmpty();
@@ -50,23 +34,26 @@ class BatchWorker : public WorkerBase
     thread_.join();
   }
 
-  virtual void pause() override
-  {
-    CHECK(!paused_);
-    CHECK(thread_.joinable());
+  virtual void pause() override {
+    if (paused_) {
+      throw std::runtime_error("Already paused");
+    }
+    if (!thread_.joinable()) {
+      throw std::runtime_error("Thread not joinable");
+    }
     paused_ = true;
     thread_.join();
   }
 
-  virtual bool isPaused() const override
-  {
-    return paused_;
-  }
+  virtual bool isPaused() const override { return paused_; }
 
-  virtual void resume() override
-  {
-    CHECK(paused_);
-    CHECK(!thread_.joinable());
+  virtual void resume() override {
+    if (!paused_) {
+      throw std::runtime_error("Already paused");
+    }
+    if (thread_.joinable()) {
+      throw std::runtime_error("Thread not joinable");
+    }
     paused_ = false;
     thread_ = std::thread(&BatchWorker<DataType>::workLoop, this);
   }
@@ -74,11 +61,9 @@ class BatchWorker : public WorkerBase
  private:
   virtual void process(const std::vector<DataType>& item) = 0;
 
-  void workLoop()
-  {
+  void workLoop() {
     std::vector<DataType> items;
-    while (!paused_ && queue_.waitAndPopAvailable(&items))
-    {
+    while (!paused_ && queue_.waitAndPopAvailable(&items)) {
       process(items);
     }
   }

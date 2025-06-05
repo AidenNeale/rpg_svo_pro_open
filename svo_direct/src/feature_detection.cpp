@@ -6,42 +6,40 @@
 // This file is subject to the terms and conditions defined in the file
 // 'LICENSE', which is part of this source code package.
 
+#include <aslam/common/memory.h>
+#include <svo/common/camera.h>
+#include <svo/common/frame.h>
+#include <svo/common/logging.h>
 #include <svo/direct/feature_detection.h>
+#include <svo/direct/feature_detection_utils.h>
+#include <vikit/vision.h>
 
 #include <Eigen/Dense>
-#include <fast/fast.h>
-#include <vikit/vision.h>
-#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <aslam/common/memory.h>
-#include <svo/common/frame.h>
-#include <svo/common/camera.h>
-#include <svo/common/logging.h>
-#include <svo/direct/feature_detection_utils.h>
+#include <opencv2/imgproc/imgproc.hpp>
 
 namespace svo {
 
 namespace fd_utils = feature_detection_utils;
 
 //------------------------------------------------------------------------------
-AbstractDetector::AbstractDetector(
-    const DetectorOptions& options,
-    const CameraPtr& cam)
-  : options_(options)
-  , grid_(options_.cell_size,
-          std::ceil(static_cast<double>(cam->imageWidth())/options_.cell_size),
-          std::ceil(static_cast<double>(cam->imageHeight())/options_.cell_size))
-  , closeness_check_grid_(options_.cell_size/options_.sec_grid_fineness,
-                    std::ceil(options_.sec_grid_fineness * static_cast<double>(cam->imageWidth())/options_.cell_size),
-                    std::ceil(options_.sec_grid_fineness * static_cast<double>(cam->imageHeight())/options_.cell_size))
-{}
+AbstractDetector::AbstractDetector(const DetectorOptions& options, const CameraPtr& cam)
+    : options_(options),
+      grid_(options_.cell_size,
+            std::ceil(static_cast<double>(cam->imageWidth()) / options_.cell_size),
+            std::ceil(static_cast<double>(cam->imageHeight()) / options_.cell_size)),
+      closeness_check_grid_(
+          options_.cell_size / options_.sec_grid_fineness,
+          std::ceil(options_.sec_grid_fineness * static_cast<double>(cam->imageWidth()) /
+                    options_.cell_size),
+          std::ceil(options_.sec_grid_fineness * static_cast<double>(cam->imageHeight()) /
+                    options_.cell_size)) {}
 
 //------------------------------------------------------------------------------
-void AbstractDetector::detect(const FramePtr& frame)
-{
+void AbstractDetector::detect(const FramePtr& frame) {
   size_t max_n_features = grid_.size();
-  detect(frame->img_pyr_, frame->getMask(), max_n_features, frame->px_vec_,
-         frame->score_vec_, frame->level_vec_, frame->grad_vec_, frame->type_vec_);
+  detect(frame->img_pyr_, frame->getMask(), max_n_features, frame->px_vec_, frame->score_vec_,
+         frame->level_vec_, frame->grad_vec_, frame->type_vec_);
   frame->num_features_ = frame->px_vec_.cols();
   frame->landmark_vec_.resize(frame->num_features_, nullptr);
   frame->seed_ref_vec_.resize(frame->num_features_);
@@ -50,50 +48,31 @@ void AbstractDetector::detect(const FramePtr& frame)
 }
 
 //------------------------------------------------------------------------------
-void FastDetector::detect(
-    const ImgPyr& img_pyr,
-    const cv::Mat& mask,
-    const size_t max_n_features,
-    Keypoints& px_vec,
-    Scores& score_vec,
-    Levels& level_vec,
-    Gradients& grad_vec,
-    FeatureTypes& types_vec)
-{
-  Corners corners(
-        grid_.n_cols*grid_.n_rows,
-        Corner(0, 0, options_.threshold_primary, 0, 0.0f));
-  fd_utils::fastDetector(
-        img_pyr, options_.threshold_primary, options_.border,
-        options_.min_level, options_.max_level, corners, grid_);
-  fd_utils::fillFeatures(
-        corners, FeatureType::kCorner, mask, options_.threshold_primary,
-        max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
+void FastDetector::detect(const ImgPyr& img_pyr, const cv::Mat& mask, const size_t max_n_features,
+                          Keypoints& px_vec, Scores& score_vec, Levels& level_vec,
+                          Gradients& grad_vec, FeatureTypes& types_vec) {
+  Corners corners(grid_.n_cols * grid_.n_rows, Corner(0, 0, options_.threshold_primary, 0, 0.0f));
+  fd_utils::fastDetector(img_pyr, options_.threshold_primary, options_.border, options_.min_level,
+                         options_.max_level, corners, grid_);
+  fd_utils::fillFeatures(corners, FeatureType::kCorner, mask, options_.threshold_primary,
+                         max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
 
   resetGrid();
 }
 
 //------------------------------------------------------------------------------
-void GradientDetector::detect(
-    const ImgPyr& img_pyr,
-    const cv::Mat& mask,
-    const size_t max_n_features,
-    Keypoints& px_vec,
-    Scores& score_vec,
-    Levels& level_vec,
-    Gradients& grad_vec,
-    FeatureTypes& types_vec)
-{
+void GradientDetector::detect(const ImgPyr& img_pyr, const cv::Mat& mask,
+                              const size_t max_n_features, Keypoints& px_vec, Scores& score_vec,
+                              Levels& level_vec, Gradients& grad_vec, FeatureTypes& types_vec) {
   // Compute pyramid of derivative max magnitude
   ImgPyr mag_pyr(img_pyr.size());
-  for(size_t i=0; i<img_pyr.size(); ++i)
-  {
+  for (size_t i = 0; i < img_pyr.size(); ++i) {
     fd_utils::computeDerivMaxMagnitude(img_pyr[i], mag_pyr[i]);
   }
 
   cv::Mat mag_ss;
-  mag_pyr[0].convertTo(mag_ss, CV_32F, 1.0f/500.0f);
-  //const int stride=mag_ss.cols;
+  mag_pyr[0].convertTo(mag_ss, CV_32F, 1.0f / 500.0f);
+  // const int stride=mag_ss.cols;
 #if 0
   const size_t max_level=img_pyr.size();
 
@@ -123,124 +102,85 @@ void GradientDetector::detect(
   fd_utils::setCornerAngles(img_pyr, &corners);
 
   // Create feature for every corner that has high enough corner score
-  fd_utils::fillFeatures(
-        corners, FeatureType::kEdgelet, mask, options_.threshold_secondary,
-        max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
+  fd_utils::fillFeatures(corners, FeatureType::kEdgelet, mask, options_.threshold_secondary,
+                         max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
 }
 
-void GradientDetectorGrid::detect(
-    const ImgPyr& img_pyr,
-    const cv::Mat& mask,
-    const size_t max_n_features,
-    Keypoints& px_vec,
-    Scores& score_vec,
-    Levels& level_vec,
-    Gradients& grad_vec,
-    FeatureTypes& types_vec)
-{
-  Corners corners(
-        grid_.n_cols * grid_.n_rows,
-        Corner(0, 0, options_.threshold_secondary, 0, 0.0f));
-  fd_utils::edgeletDetector_V2(
-        img_pyr, options_.threshold_secondary, options_.border,
-        options_.min_level, options_.max_level, corners, grid_);
-  fd_utils::fillFeatures(
-        corners, FeatureType::kEdgelet, mask, options_.threshold_secondary,
-        max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
+void GradientDetectorGrid::detect(const ImgPyr& img_pyr, const cv::Mat& mask,
+                                  const size_t max_n_features, Keypoints& px_vec, Scores& score_vec,
+                                  Levels& level_vec, Gradients& grad_vec, FeatureTypes& types_vec) {
+  Corners corners(grid_.n_cols * grid_.n_rows, Corner(0, 0, options_.threshold_secondary, 0, 0.0f));
+  fd_utils::edgeletDetector_V2(img_pyr, options_.threshold_secondary, options_.border,
+                               options_.min_level, options_.max_level, corners, grid_);
+  fd_utils::fillFeatures(corners, FeatureType::kEdgelet, mask, options_.threshold_secondary,
+                         max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
 
   resetGrid();
 }
 
 //------------------------------------------------------------------------------
-void FastGradDetector::detect(
-    const ImgPyr& img_pyr,
-    const cv::Mat& mask,
-    const size_t max_n_features,
-    Keypoints& px_vec,
-    Scores& score_vec,
-    Levels& level_vec,
-    Gradients& grad_vec,
-    FeatureTypes& types_vec)
-{
+void FastGradDetector::detect(const ImgPyr& img_pyr, const cv::Mat& mask,
+                              const size_t max_n_features, Keypoints& px_vec, Scores& score_vec,
+                              Levels& level_vec, Gradients& grad_vec, FeatureTypes& types_vec) {
   {
     // Detect fast corners.
-    Corners corners(
-          grid_.n_cols*grid_.n_rows,
-          Corner(0, 0, options_.threshold_primary, 0, 0.0f));
-    fd_utils::fastDetector(
-          img_pyr, options_.threshold_primary, options_.border,
-          options_.min_level, options_.max_level, corners, grid_);
-    fd_utils::fillFeatures(
-          corners, FeatureType::kCorner, mask, options_.threshold_primary,
-          max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
+    Corners corners(grid_.n_cols * grid_.n_rows, Corner(0, 0, options_.threshold_primary, 0, 0.0f));
+    fd_utils::fastDetector(img_pyr, options_.threshold_primary, options_.border, options_.min_level,
+                           options_.max_level, corners, grid_);
+    fd_utils::fillFeatures(corners, FeatureType::kCorner, mask, options_.threshold_primary,
+                           max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec,
+                           grid_);
   }
 
   int max_features = static_cast<int>(max_n_features) - px_vec.cols();
-  if(max_features > 0)
-  {
+  if (max_features > 0) {
     // Detect edgelets.
-    Corners corners(
-          grid_.n_cols * grid_.n_rows,
-          Corner(0, 0, options_.threshold_secondary, 0, 0.0f));
-    fd_utils::edgeletDetector_V2(
-          img_pyr, options_.threshold_secondary, options_.border,
-          options_.min_level, options_.max_level, corners, grid_);
-    fd_utils::fillFeatures(
-          corners, FeatureType::kEdgelet, mask, options_.threshold_secondary,
-          max_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
+    Corners corners(grid_.n_cols * grid_.n_rows,
+                    Corner(0, 0, options_.threshold_secondary, 0, 0.0f));
+    fd_utils::edgeletDetector_V2(img_pyr, options_.threshold_secondary, options_.border,
+                                 options_.min_level, options_.max_level, corners, grid_);
+    fd_utils::fillFeatures(corners, FeatureType::kEdgelet, mask, options_.threshold_secondary,
+                           max_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
   }
 
   resetGrid();
 }
 
 //------------------------------------------------------------------------------
-void ShiTomasiGradDetector::detect(
-    const ImgPyr& img_pyr,
-    const cv::Mat& mask,
-    const size_t max_n_features,
-    Keypoints& px_vec,
-    Scores& score_vec,
-    Levels& level_vec,
-    Gradients& grad_vec,
-    FeatureTypes& types_vec)
-{
+void ShiTomasiGradDetector::detect(const ImgPyr& img_pyr, const cv::Mat& mask,
+                                   const size_t max_n_features, Keypoints& px_vec,
+                                   Scores& score_vec, Levels& level_vec, Gradients& grad_vec,
+                                   FeatureTypes& types_vec) {
   {
     // Detect shitomasi corners.
-    Corners corners(
-          grid_.n_cols*grid_.n_rows,
-          Corner(0, 0, options_.threshold_shitomasi, 0, 0.0f));
-    fd_utils::shiTomasiDetector(
-          img_pyr, options_.threshold_shitomasi, options_.border,
-          options_.min_level, options_.max_level, corners, grid_, closeness_check_grid_);
-    fd_utils::fillFeatures(
-          corners, FeatureType::kCorner, mask, options_.threshold_shitomasi,
-          max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
+    Corners corners(grid_.n_cols * grid_.n_rows,
+                    Corner(0, 0, options_.threshold_shitomasi, 0, 0.0f));
+    fd_utils::shiTomasiDetector(img_pyr, options_.threshold_shitomasi, options_.border,
+                                options_.min_level, options_.max_level, corners, grid_,
+                                closeness_check_grid_);
+    fd_utils::fillFeatures(corners, FeatureType::kCorner, mask, options_.threshold_shitomasi,
+                           max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec,
+                           grid_);
   }
 
   int max_features = static_cast<int>(max_n_features) - px_vec.cols();
-  if(max_features > 0)
-  {
+  if (max_features > 0) {
     // Detect fast corners.
-    Corners corners_fast(
-          grid_.n_cols*grid_.n_rows,
-          Corner(0, 0, options_.threshold_primary, 0, 0.0f));
-    fd_utils::fastDetector(
-          img_pyr, options_.threshold_primary, options_.border,
-          options_.min_level, options_.max_level, corners_fast, grid_);
-    fd_utils::fillFeatures(
-          corners_fast, FeatureType::kCorner, mask, options_.threshold_primary,
-          max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
+    Corners corners_fast(grid_.n_cols * grid_.n_rows,
+                         Corner(0, 0, options_.threshold_primary, 0, 0.0f));
+    fd_utils::fastDetector(img_pyr, options_.threshold_primary, options_.border, options_.min_level,
+                           options_.max_level, corners_fast, grid_);
+    fd_utils::fillFeatures(corners_fast, FeatureType::kCorner, mask, options_.threshold_primary,
+                           max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec,
+                           grid_);
 
     // Detect edgelets.
-    Corners corners_grad(
-          grid_.n_cols * grid_.n_rows,
-          Corner(0, 0, options_.threshold_secondary, 0, 0.0f));
-    fd_utils::edgeletDetector_V2(
-          img_pyr, options_.threshold_secondary, options_.border,
-          options_.min_level, options_.max_level, corners_grad, grid_);
-    fd_utils::fillFeatures(
-          corners_grad, FeatureType::kEdgelet, mask, options_.threshold_secondary,
-          max_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
+    Corners corners_grad(grid_.n_cols * grid_.n_rows,
+                         Corner(0, 0, options_.threshold_secondary, 0, 0.0f));
+    fd_utils::edgeletDetector_V2(img_pyr, options_.threshold_secondary, options_.border,
+                                 options_.min_level, options_.max_level, corners_grad, grid_);
+    fd_utils::fillFeatures(corners_grad, FeatureType::kEdgelet, mask, options_.threshold_secondary,
+                           max_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
   }
 
   resetGrid();
@@ -248,28 +188,19 @@ void ShiTomasiGradDetector::detect(
 
 //------------------------------------------------------------------------------
 
-void ShiTomasiDetector::detect(
-    const ImgPyr& img_pyr,
-    const cv::Mat& mask,
-    const size_t max_n_features,
-    Keypoints& px_vec,
-    Scores& score_vec,
-    Levels& level_vec,
-    Gradients& grad_vec,
-    FeatureTypes& types_vec)
-{
+void ShiTomasiDetector::detect(const ImgPyr& img_pyr, const cv::Mat& mask,
+                               const size_t max_n_features, Keypoints& px_vec, Scores& score_vec,
+                               Levels& level_vec, Gradients& grad_vec, FeatureTypes& types_vec) {
   {
     // Detect shitomasi corners.
-    Corners corners(
-          grid_.n_cols*grid_.n_rows,
-          Corner(0, 0, options_.threshold_shitomasi, 0, 0.0f));
-    fd_utils::shiTomasiDetector(
-          img_pyr, options_.threshold_shitomasi, options_.border,
-          options_.min_level, options_.max_level, corners, grid_,
-          closeness_check_grid_);
-    fd_utils::fillFeatures(
-          corners, FeatureType::kMapPoint, mask, options_.threshold_shitomasi,
-          max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec, grid_);
+    Corners corners(grid_.n_cols * grid_.n_rows,
+                    Corner(0, 0, options_.threshold_shitomasi, 0, 0.0f));
+    fd_utils::shiTomasiDetector(img_pyr, options_.threshold_shitomasi, options_.border,
+                                options_.min_level, options_.max_level, corners, grid_,
+                                closeness_check_grid_);
+    fd_utils::fillFeatures(corners, FeatureType::kMapPoint, mask, options_.threshold_shitomasi,
+                           max_n_features, px_vec, score_vec, level_vec, grad_vec, types_vec,
+                           grid_);
   }
   resetGrid();
 }
@@ -303,22 +234,16 @@ void AllPixelsDetector::detect(
 
   resetGrid();
 }
-#else // new
-void AllPixelsDetector::detect(
-    const ImgPyr& img_pyr,
-    const cv::Mat& mask,
-    const size_t /*max_n_features*/,
-    Keypoints& px_vec,
-    Scores& score_vec,
-    Levels& level_vec,
-    Gradients& grad_vec,
-    FeatureTypes& types_vec)
-{
+#else  // new
+void AllPixelsDetector::detect(const ImgPyr& img_pyr, const cv::Mat& mask,
+                               const size_t /*max_n_features*/, Keypoints& px_vec,
+                               Scores& score_vec, Levels& level_vec, Gradients& grad_vec,
+                               FeatureTypes& types_vec) {
   const int width = img_pyr.at(options_.sampling_level).cols;
   const int height = img_pyr.at(options_.sampling_level).rows;
   const int pyr_init_scale = 1 << options_.sampling_level;
   const int border = options_.border;
-  const size_t num_features = (width-2*border) * (height-2*border);
+  const size_t num_features = (width - 2 * border) * (height - 2 * border);
 
   px_vec.resize(Eigen::NoChange, num_features);
   score_vec.setConstant(num_features, 1.0);
@@ -326,26 +251,17 @@ void AllPixelsDetector::detect(
   grad_vec.resize(Eigen::NoChange, num_features);
   types_vec.assign(num_features, svo::FeatureType::kCorner);
   size_t feature_index = 0;
-  for(int y=border; y<height-border; ++y)
-  {
-    for(int x=border; x<width-border; ++x)
-    {
-      px_vec.col(feature_index++) = svo::Keypoint(x*pyr_init_scale, y*pyr_init_scale);
+  for (int y = border; y < height - border; ++y) {
+    for (int x = border; x < width - border; ++x) {
+      px_vec.col(feature_index++) = svo::Keypoint(x * pyr_init_scale, y * pyr_init_scale);
     }
   }
 }
 #endif
 
-void CannyDetector::detect(
-    const ImgPyr& img_pyr,
-    const cv::Mat& mask,
-    const size_t max_n_features,
-    Keypoints& px_vec,
-    Scores& score_vec,
-    Levels& level_vec,
-    Gradients& grad_vec,
-    FeatureTypes& types_vec)
-{
+void CannyDetector::detect(const ImgPyr& img_pyr, const cv::Mat& mask, const size_t max_n_features,
+                           Keypoints& px_vec, Scores& score_vec, Levels& level_vec,
+                           Gradients& grad_vec, FeatureTypes& types_vec) {
   // Compute pyramid of derivative max magnitude
   cv::Mat canny_edges;
   fd_utils::detectCannyEdges(img_pyr[options_.sampling_level], canny_edges);
@@ -358,13 +274,10 @@ void CannyDetector::detect(
 
   px_vec.resize(Eigen::NoChange, max_num_features);
   size_t feature_index = 0;
-  for(int y=border; y<height-border; ++y)
-  {
-    for(int x=border; x<width-border; ++x)
-    {
-      if (canny_edges.at<uchar>(y,x))
-      {
-        px_vec.col(feature_index++) = svo::Keypoint(x*pyr_init_scale, y*pyr_init_scale);
+  for (int y = border; y < height - border; ++y) {
+    for (int x = border; x < width - border; ++x) {
+      if (canny_edges.at<uchar>(y, x)) {
+        px_vec.col(feature_index++) = svo::Keypoint(x * pyr_init_scale, y * pyr_init_scale);
       }
     }
   }
@@ -377,16 +290,9 @@ void CannyDetector::detect(
   types_vec.assign(num_features, svo::FeatureType::kCorner);
 }
 
-void SobelDetector::detect(
-    const ImgPyr& img_pyr,
-    const cv::Mat& mask,
-    const size_t max_n_features,
-    Keypoints& px_vec,
-    Scores& score_vec,
-    Levels& level_vec,
-    Gradients& grad_vec,
-    FeatureTypes& types_vec)
-{
+void SobelDetector::detect(const ImgPyr& img_pyr, const cv::Mat& mask, const size_t max_n_features,
+                           Keypoints& px_vec, Scores& score_vec, Levels& level_vec,
+                           Gradients& grad_vec, FeatureTypes& types_vec) {
   // Compute pyramid of derivative max magnitude
   cv::Mat sobel_edges;
   fd_utils::detectSobelEdges(img_pyr[options_.sampling_level], sobel_edges);
@@ -395,17 +301,14 @@ void SobelDetector::detect(
   const int height = img_pyr.at(options_.sampling_level).rows;
   const int border = 1;
   const int pyr_init_scale = 1 << options_.sampling_level;
-  const int max_num_features = cv::countNonZero(sobel_edges==255);
+  const int max_num_features = cv::countNonZero(sobel_edges == 255);
 
   px_vec.resize(Eigen::NoChange, max_num_features);
   size_t feature_index = 0;
-  for(int y=border; y<height-border; ++y)
-  {
-    for(int x=border; x<width-border; ++x)
-    {
-      if (sobel_edges.at<uchar>(y,x))
-      {
-        px_vec.col(feature_index++) = svo::Keypoint(x*pyr_init_scale, y*pyr_init_scale);
+  for (int y = border; y < height - border; ++y) {
+    for (int x = border; x < width - border; ++x) {
+      if (sobel_edges.at<uchar>(y, x)) {
+        px_vec.col(feature_index++) = svo::Keypoint(x * pyr_init_scale, y * pyr_init_scale);
       }
     }
   }
@@ -419,20 +322,13 @@ void SobelDetector::detect(
 }
 
 //------------------------------------------------------------------------------
-void GradientHuangMumfordDetector::detect(
-    const ImgPyr& img_pyr,
-    const cv::Mat& mask,
-    const size_t max_n_features,
-    Keypoints& px_vec,
-    Scores& score_vec,
-    Levels& level_vec,
-    Gradients& grad_vec,
-    FeatureTypes& types_vec)
-{
+void GradientHuangMumfordDetector::detect(const ImgPyr& img_pyr, const cv::Mat& mask,
+                                          const size_t max_n_features, Keypoints& px_vec,
+                                          Scores& score_vec, Levels& level_vec, Gradients& grad_vec,
+                                          FeatureTypes& types_vec) {
   // Compute pyramid of derivative max magnitude
   ImgPyr mag_pyr_32f(img_pyr.size());
-  for(size_t i=0; i<img_pyr.size(); ++i)
-  {
+  for (size_t i = 0; i < img_pyr.size(); ++i) {
     fd_utils::computeDerivHuangMumford(img_pyr[i], mag_pyr_32f[i]);
   }
 
@@ -443,9 +339,9 @@ void GradientHuangMumfordDetector::detect(
 
   cv::Mat mag_level_32f = mag_pyr_32f[options_.sampling_level];
   cv::Mat mag_level_thresholded;
-  cv::threshold(mag_level_32f, mag_level_thresholded, options_.threshold_primary,
-                1.0, cv::THRESH_BINARY_INV);
-  const int max_num_features = cv::countNonZero(mag_level_thresholded==1.0);
+  cv::threshold(mag_level_32f, mag_level_thresholded, options_.threshold_primary, 1.0,
+                cv::THRESH_BINARY_INV);
+  const int max_num_features = cv::countNonZero(mag_level_thresholded == 1.0);
 
 #if 0
   cv::imshow("mag_level_32f", mag_level_32f);
@@ -455,13 +351,10 @@ void GradientHuangMumfordDetector::detect(
   px_vec.resize(Eigen::NoChange, max_num_features);
 
   size_t feature_index = 0;
-  for(int y=border; y<height-border; ++y)
-  {
-    for(int x=border; x<width-border; ++x)
-    {
-      if (mag_level_thresholded.at<uchar>(y,x))
-      {
-        px_vec.col(feature_index++) = svo::Keypoint(x*pyr_init_scale, y*pyr_init_scale);
+  for (int y = border; y < height - border; ++y) {
+    for (int x = border; x < width - border; ++x) {
+      if (mag_level_thresholded.at<uchar>(y, x)) {
+        px_vec.col(feature_index++) = svo::Keypoint(x * pyr_init_scale, y * pyr_init_scale);
       }
     }
   }
@@ -475,16 +368,15 @@ void GradientHuangMumfordDetector::detect(
   grad_vec.resize(Eigen::NoChange, num_features);
   types_vec.assign(num_features, svo::FeatureType::kCorner);
 
-//  // Nonmax suppression
-//  Corners corners;
-//  fd_utils::nonmax(mag_ss, options_.threshold_primary, &corners);
-//  fd_utils::setCornerAngles(img_pyr, &corners);
+  //  // Nonmax suppression
+  //  Corners corners;
+  //  fd_utils::nonmax(mag_ss, options_.threshold_primary, &corners);
+  //  fd_utils::setCornerAngles(img_pyr, &corners);
 
-//  // Create feature for every corner that has high enough corner score
-//  fd_utils::fillFeatures(
-//        corners, FeatureType::kEdgelet, mask, options_.threshold_secondary,
-//        px_vec, level_vec, grad_vec, types_vec, grid_);
+  //  // Create feature for every corner that has high enough corner score
+  //  fd_utils::fillFeatures(
+  //        corners, FeatureType::kEdgelet, mask, options_.threshold_secondary,
+  //        px_vec, level_vec, grad_vec, types_vec, grid_);
 }
 
-} // namespace svo
-
+}  // namespace svo

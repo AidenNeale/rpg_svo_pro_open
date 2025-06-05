@@ -5,7 +5,7 @@
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright notice,
  *     this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright notice,
@@ -49,31 +49,27 @@ namespace svo {
 namespace ceres_backend {
 
 // Construct with measurement and information matrix.
-RelativePoseError::RelativePoseError(
-    const Eigen::Matrix<double, 6, 6>& information)
-{
+RelativePoseError::RelativePoseError(const Eigen::Matrix<double, 6, 6>& information) {
   setInformation(information);
 }
 
 // Construct with measurement and variance.
-RelativePoseError::RelativePoseError(double translationVariance,
-                                     double rotationVariance)
-{
-
-  DEBUG_CHECK_GT(translationVariance, 0.0);
-  DEBUG_CHECK_GT(rotationVariance, 0.0);
+RelativePoseError::RelativePoseError(double translationVariance, double rotationVariance) {
+  if (translationVariance <= 0.0) {
+    throw std::invalid_argument("Translation variance must be positive.");
+  }
+  if (rotationVariance <= 0.0) {
+    throw std::invalid_argument("Rotation variance must be positive.");
+  }
   information_t information;
   information.setZero();
-  information.topLeftCorner<3, 3>() = Eigen::Matrix3d::Identity() *
-                                      1.0 / translationVariance;
-  information.bottomRightCorner<3, 3>() = Eigen::Matrix3d::Identity() *
-                                          1.0 / rotationVariance;
+  information.topLeftCorner<3, 3>() = Eigen::Matrix3d::Identity() * 1.0 / translationVariance;
+  information.bottomRightCorner<3, 3>() = Eigen::Matrix3d::Identity() * 1.0 / rotationVariance;
   setInformation(information);
 }
 
 // Set the information.
-void RelativePoseError::setInformation(const information_t& information)
-{
+void RelativePoseError::setInformation(const information_t& information) {
   information_ = information;
   covariance_ = information.inverse();
   // perform the Cholesky decomposition on order to obtain the correct error weighting
@@ -82,27 +78,23 @@ void RelativePoseError::setInformation(const information_t& information)
 }
 
 // This evaluates the error term and additionally computes the Jacobians.
-bool RelativePoseError::Evaluate(double const* const * parameters,
-                                 double* residuals, double** jacobians) const
-{
+bool RelativePoseError::Evaluate(double const* const* parameters, double* residuals,
+                                 double** jacobians) const {
   return EvaluateWithMinimalJacobians(parameters, residuals, jacobians, nullptr);
 }
 
 // This evaluates the error term and additionally computes
 // the Jacobians in the minimal internal representation.
-bool RelativePoseError::EvaluateWithMinimalJacobians(
-    double const* const * parameters, double* residuals, double** jacobians,
-    double** jacobians_minimal) const
-{
+bool RelativePoseError::EvaluateWithMinimalJacobians(double const* const* parameters,
+                                                     double* residuals, double** jacobians,
+                                                     double** jacobians_minimal) const {
   // compute error
   Transformation T_WS_0(
       Eigen::Vector3d(parameters[0][0], parameters[0][1], parameters[0][2]),
-      Eigen::Quaterniond(parameters[0][6], parameters[0][3], parameters[0][4],
-                         parameters[0][5]));
+      Eigen::Quaterniond(parameters[0][6], parameters[0][3], parameters[0][4], parameters[0][5]));
   Transformation T_WS_1(
       Eigen::Vector3d(parameters[1][0], parameters[1][1], parameters[1][2]),
-      Eigen::Quaterniond(parameters[1][6], parameters[1][3], parameters[1][4],
-                         parameters[1][5]));
+      Eigen::Quaterniond(parameters[1][6], parameters[1][3], parameters[1][4], parameters[1][5]));
   // delta pose
   Transformation dp = T_WS_1 * T_WS_0.inverse();
   // get the error
@@ -116,10 +108,8 @@ bool RelativePoseError::EvaluateWithMinimalJacobians(
   weighted_error = square_root_information_ * error;
 
   // compute Jacobian...
-  if (jacobians != nullptr)
-  {
-    if (jacobians[0] != nullptr)
-    {
+  if (jacobians != nullptr) {
+    if (jacobians[0] != nullptr) {
       Eigen::Map<Eigen::Matrix<double, 6, 7, Eigen::RowMajor> > J0(jacobians[0]);
       Eigen::Matrix<double, 6, 6, Eigen::RowMajor> J0_minimal;
       J0_minimal.setIdentity();
@@ -135,15 +125,13 @@ bool RelativePoseError::EvaluateWithMinimalJacobians(
       // hallucinate Jacobian w.r.t. state
       J0 = J0_minimal * J_lift;
 
-      if (jacobians_minimal != nullptr && jacobians_minimal[0] != nullptr)
-      {
-        Eigen::Map<Eigen::Matrix<double, 6, 6, Eigen::RowMajor> >
-            J0_minimal_mapped(jacobians_minimal[0]);
+      if (jacobians_minimal != nullptr && jacobians_minimal[0] != nullptr) {
+        Eigen::Map<Eigen::Matrix<double, 6, 6, Eigen::RowMajor> > J0_minimal_mapped(
+            jacobians_minimal[0]);
         J0_minimal_mapped = J0_minimal;
       }
     }
-    if (jacobians[1] != nullptr)
-    {
+    if (jacobians[1] != nullptr) {
       Eigen::Map<Eigen::Matrix<double, 6, 7, Eigen::RowMajor> > J1(jacobians[1]);
       Eigen::Matrix<double, 6, 6, Eigen::RowMajor> J1_minimal;
       J1_minimal.setIdentity();
@@ -158,10 +146,9 @@ bool RelativePoseError::EvaluateWithMinimalJacobians(
       // hallucinate Jacobian w.r.t. state
       J1 = J1_minimal * J_lift;
 
-      if (jacobians_minimal != nullptr && jacobians_minimal[1] != nullptr)
-      {
-        Eigen::Map<Eigen::Matrix<double, 6, 6, Eigen::RowMajor> >
-            J1_minimal_mapped(jacobians_minimal[1]);
+      if (jacobians_minimal != nullptr && jacobians_minimal[1] != nullptr) {
+        Eigen::Map<Eigen::Matrix<double, 6, 6, Eigen::RowMajor> > J1_minimal_mapped(
+            jacobians_minimal[1]);
         J1_minimal_mapped = J1_minimal;
       }
     }
@@ -172,4 +159,3 @@ bool RelativePoseError::EvaluateWithMinimalJacobians(
 
 }  // namespace ceres_backend
 }  // namespace svo
-

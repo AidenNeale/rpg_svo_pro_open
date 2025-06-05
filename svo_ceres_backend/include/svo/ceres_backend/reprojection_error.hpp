@@ -5,7 +5,7 @@
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright notice,
  *     this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright notice,
@@ -40,21 +40,20 @@
 
 #pragma once
 
-#include <memory>
-
 #include <ceres/ceres.h>
 
-#include "svo/common/camera.h"
+#include <memory>
+
 #include "svo/ceres_backend/error_interface.hpp"
 #include "svo/ceres_backend/pose_local_parameterization.hpp"
 #include "svo/ceres_backend/reprojection_error_base.hpp"
+#include "svo/common/camera.h"
 
 namespace svo {
 namespace ceres_backend {
 
 /// \brief The 2D keypoint reprojection error.
-class ReprojectionError : public ReprojectionErrorBase
-{
+class ReprojectionError : public ReprojectionErrorBase {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -68,35 +67,30 @@ class ReprojectionError : public ReprojectionErrorBase
   typedef Eigen::Vector2d keypoint_t;
 
   /// \brief Default constructor.
-  ReprojectionError(){}
+  ReprojectionError() {}
 
   /// \brief Construct with measurement and information matrix
   /// @param[in] cameraGeometry The underlying camera geometry.
   /// @param[in] measurement The measurement.
   /// @param[in] information The information (weight) matrix.
-  ReprojectionError(CameraConstPtr cameraGeometry,
-                    const measurement_t& measurement,
+  ReprojectionError(CameraConstPtr cameraGeometry, const measurement_t& measurement,
                     const covariance_t& information);
 
   /// \brief Trivial destructor.
-  virtual ~ReprojectionError()
-  {
-  }
+  virtual ~ReprojectionError() {}
 
   // setters
   /// \brief Set the measurement.
   /// @param[in] measurement The measurement.
-  virtual void setMeasurement(const measurement_t& measurement)
-  {
-    measurement_ = measurement;
-  }
+  virtual void setMeasurement(const measurement_t& measurement) { measurement_ = measurement; }
 
   /// \brief Set the underlying camera model.
   /// @param[in] cameraGeometry The camera geometry.
-  void setCameraGeometry(
-      CameraConstPtr camera_geometry)
-  {
-    CHECK(camera_geometry != nullptr);
+  void setCameraGeometry(CameraConstPtr camera_geometry) {
+    if (!camera_geometry) {
+      throw std::invalid_argument(
+          "Camera geometry pointer is null. Please provide a valid camera geometry.");
+    }
     camera_geometry_ = camera_geometry;
   }
 
@@ -107,24 +101,15 @@ class ReprojectionError : public ReprojectionErrorBase
   // getters
   /// \brief Get the measurement.
   /// \return The measurement vector.
-  virtual const measurement_t& measurement() const
-  {
-    return measurement_;
-  }
+  virtual const measurement_t& measurement() const { return measurement_; }
 
   /// \brief Get the information matrix.
   /// \return The information (weight) matrix.
-  virtual const covariance_t& information() const
-  {
-    return information_;
-  }
+  virtual const covariance_t& information() const { return information_; }
 
   /// \brief Get the covariance matrix.
   /// \return The inverse information (covariance) matrix.
-  virtual const covariance_t& covariance() const
-  {
-    return covariance_;
-  }
+  virtual const covariance_t& covariance() const { return covariance_; }
 
   // error term and Jacobian implementation
   /**
@@ -134,7 +119,7 @@ class ReprojectionError : public ReprojectionErrorBase
    * @param jacobians Pointer to the Jacobians (see ceres)
    * @return success of th evaluation.
    */
-  virtual bool Evaluate(double const* const * parameters, double* residuals,
+  virtual bool Evaluate(double const* const* parameters, double* residuals,
                         double** jacobians) const;
 
   /**
@@ -146,58 +131,39 @@ class ReprojectionError : public ReprojectionErrorBase
    * @param jacobians_minimal Pointer to the minimal Jacobians (equivalent to jacobians).
    * @return Success of the evaluation.
    */
-  virtual bool EvaluateWithMinimalJacobians(double const* const * parameters,
-                                            double* residuals,
-                                            double** jacobians,
-                                            double** jacobians_minimal) const;
+  virtual bool EvaluateWithMinimalJacobians(double const* const* parameters, double* residuals,
+                                            double** jacobians, double** jacobians_minimal) const;
 
-  inline void setDisabled(const bool disabled)
-  {
-    disabled_ = disabled;
-  }
+  inline void setDisabled(const bool disabled) { disabled_ = disabled; }
 
-  inline void setPointConstant(const bool point_constant)
-  {
-    point_constant_ = point_constant;
-  }
+  inline void setPointConstant(const bool point_constant) { point_constant_ = point_constant; }
 
   // sizes
   /// \brief Residual dimension.
-  size_t residualDim() const
-  {
-    return kNumResiduals;
-  }
+  size_t residualDim() const { return kNumResiduals; }
 
   /// \brief Number of parameter blocks.
-  size_t parameterBlocks() const
-  {
-    return parameter_block_sizes().size();
-  }
+  size_t parameterBlocks() const { return parameter_block_sizes().size(); }
 
   /// \brief Dimension of an individual parameter block.
-  size_t parameterBlockDim(size_t parameter_block_idx) const
-  {
+  size_t parameterBlockDim(size_t parameter_block_idx) const {
     return base_t::parameter_block_sizes().at(parameter_block_idx);
   }
 
   /// @brief Residual block type as string
-  virtual ErrorType typeInfo() const
-  {
-    return ErrorType::kReprojectionError;
-  }
+  virtual ErrorType typeInfo() const { return ErrorType::kReprojectionError; }
 
  protected:
-
   // the measurement
-  measurement_t measurement_; ///< The (2D) measurement.
+  measurement_t measurement_;  ///< The (2D) measurement.
 
   /// \brief The camera model:
   CameraConstPtr camera_geometry_;
 
   // weighting related
-  covariance_t information_; ///< The 2x2 information matrix.
-  covariance_t square_root_information_; ///< The 2x2 square root information matrix.
-  covariance_t covariance_; ///< The 2x2 covariance matrix.
+  covariance_t information_;              ///< The 2x2 information matrix.
+  covariance_t square_root_information_;  ///< The 2x2 square root information matrix.
+  covariance_t covariance_;               ///< The 2x2 covariance matrix.
 
   bool disabled_ = false;
   bool point_constant_ = false;

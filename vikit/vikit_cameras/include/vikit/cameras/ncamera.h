@@ -1,13 +1,13 @@
 #pragma once
 
+#include <aslam/common/macros.h>
+#include <aslam/common/pose-types.h>
+
+#include <Eigen/Core>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include <Eigen/Core>
-#include <aslam/common/macros.h>
-#include <aslam/common/pose-types.h>
 
 namespace vk {
 namespace cameras {
@@ -18,20 +18,17 @@ using Transformation = aslam::Transformation;
 using TransformationVector = aslam::TransformationVector;
 using Quaternion = aslam::Quaternion;
 
-class NCamera
-{
-public:
+class NCamera {
+ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   ASLAM_POINTER_TYPEDEFS(NCamera);
 
-protected:
+ protected:
   NCamera() = default;
 
-public:
-  NCamera(
-      const TransformationVector& T_C_B,
-      const std::vector<std::shared_ptr<Camera>>& cameras,
-      const std::string& label);
+ public:
+  NCamera(const TransformationVector& T_C_B, const std::vector<std::shared_ptr<Camera>>& cameras,
+          const std::string& label);
 
   ~NCamera() {}
 
@@ -69,21 +66,24 @@ public:
   const std::vector<std::shared_ptr<Camera>>& getCameraVector() const;
 
   /// Get a label for the camera.
-  inline const std::string& getLabel() const {return label_;}
+  inline const std::string& getLabel() const { return label_; }
 
   /// Set a label for the camera.
-  inline void setLabel(const std::string& label) {label_ = label;}
+  inline void setLabel(const std::string& label) { label_ = label; }
 
   /// keep first N cameras
-  inline void keepFirstNCams(const int N)
-  {
-    CHECK_LT(N, static_cast<int>(cameras_.size()));
-    CHECK_GT(N, 0);
+  inline void keepFirstNCams(const int N) {
+    if (N >= static_cast<int>(cameras_.size())) {
+      throw std::runtime_error("NCamera::keepFirstNCams: N is larger than the number of cameras.");
+    }
+    if (N <= 0) {
+      throw std::runtime_error("NCamera::keepFirstNCams: N is smaller than or equal to zero.");
+    }
     T_C_B_.erase(T_C_B_.begin() + N, T_C_B_.end());
     cameras_.erase(cameras_.begin() + N, cameras_.end());
   }
 
-private:
+ private:
   /// Internal consistency checks and initialization.
   void initInternal();
 
@@ -97,6 +97,5 @@ private:
   std::string label_;
 };
 
-} // namespace cameras
-} // namespace vikit
-
+}  // namespace cameras
+}  // namespace vk

@@ -2,17 +2,15 @@
 // Unauthorized copying of this file, via any medium is strictly prohibited
 // Proprietary and confidential
 
+#include <aslam/common/entrypoint.h>
 #include <gtest/gtest.h>
 
-#include <aslam/common/entrypoint.h>
 #include <svo/vio_common/test_utils.hpp>
 
 #include "svo/ceres_backend/estimator_types.hpp"
 
-TEST(BackendIdTests, NFrameIdTest)
-{
-  int32_t bundle_id =
-      svo::test_utils::sampleUniformIntDistribution<int32_t>(true, 0);
+TEST(BackendIdTests, NFrameIdTest) {
+  int32_t bundle_id = svo::test_utils::sampleUniformIntDistribution<int32_t>(true, 0);
 
   svo::BackendId id = svo::createNFrameId(bundle_id);
 
@@ -20,8 +18,7 @@ TEST(BackendIdTests, NFrameIdTest)
   EXPECT_EQ(id.bundleId(), bundle_id);
 }
 
-TEST(BackendIdTests, LandmarkIdTest)
-{
+TEST(BackendIdTests, LandmarkIdTest) {
   int track_id = svo::test_utils::sampleUniformIntDistribution<int>(true, 0);
 
   svo::BackendId id = svo::createLandmarkId(track_id);
@@ -30,10 +27,8 @@ TEST(BackendIdTests, LandmarkIdTest)
   EXPECT_EQ(id.trackId(), track_id);
 }
 
-TEST(BackendIdTests, ImuStatesIdTest)
-{
-  int32_t bundle_id =
-      svo::test_utils::sampleUniformIntDistribution<int32_t>(true, 0);
+TEST(BackendIdTests, ImuStatesIdTest) {
+  int32_t bundle_id = svo::test_utils::sampleUniformIntDistribution<int32_t>(true, 0);
 
   svo::BackendId id = svo::createImuStateId(bundle_id);
 
@@ -41,12 +36,9 @@ TEST(BackendIdTests, ImuStatesIdTest)
   EXPECT_EQ(id.bundleId(), bundle_id);
 }
 
-TEST(BackendIdTests, ExtrinsicsIdTest)
-{
-  int32_t bundle_id =
-      svo::test_utils::sampleUniformIntDistribution<int32_t>(true, 0);
-  uint8_t camera_index =
-      svo::test_utils::sampleUniformIntDistribution<uint8_t>(true);
+TEST(BackendIdTests, ExtrinsicsIdTest) {
+  int32_t bundle_id = svo::test_utils::sampleUniformIntDistribution<int32_t>(true, 0);
+  uint8_t camera_index = svo::test_utils::sampleUniformIntDistribution<uint8_t>(true);
 
   svo::BackendId id = svo::createExtrinsicsId(camera_index, bundle_id);
 
@@ -55,13 +47,10 @@ TEST(BackendIdTests, ExtrinsicsIdTest)
   EXPECT_EQ(id.cameraIndex(), camera_index);
 }
 
-TEST(BackendIdTests, ChangeTypeTest)
-{
+TEST(BackendIdTests, ChangeTypeTest) {
   using namespace svo;
-  int32_t bundle_id =
-      svo::test_utils::sampleUniformIntDistribution<int32_t>(true, 0);
-  uint8_t camera_index =
-      svo::test_utils::sampleUniformIntDistribution<uint8_t>(true);
+  int32_t bundle_id = svo::test_utils::sampleUniformIntDistribution<int32_t>(true, 0);
+  uint8_t camera_index = svo::test_utils::sampleUniformIntDistribution<uint8_t>(true);
 
   const BackendId nframe_id = createNFrameId(bundle_id);
   const BackendId speed_and_bias_id = createImuStateId(bundle_id);
@@ -76,8 +65,7 @@ TEST(BackendIdTests, ChangeTypeTest)
 
   // Change speed and bias ID to others.
   nframe_id_gen = changeIdType(speed_and_bias_id, IdType::NFrame);
-  extrinsics_id_gen =
-      changeIdType(speed_and_bias_id, IdType::Extrinsics, camera_index);
+  extrinsics_id_gen = changeIdType(speed_and_bias_id, IdType::Extrinsics, camera_index);
   EXPECT_EQ(nframe_id, nframe_id_gen);
   EXPECT_EQ(extrinsics_id, extrinsics_id_gen);
 

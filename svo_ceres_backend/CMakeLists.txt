@@ -1,18 +1,34 @@
+cmake_minimum_required(VERSION 3.8)
 project(svo_ceres_backend)
-cmake_minimum_required(VERSION 2.8.3)
 
-find_package(catkin_simple REQUIRED)
-catkin_simple(ALL_DEPS_REQUIRED)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
-################################################################################
-# generic setup (compiler flags, etc.)
-include(SvoSetup)
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_gtest REQUIRED)
+
+find_package(rclcpp REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(PCL COMPONENTS common REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+
+find_package(svo REQUIRED)
+find_package(svo_common REQUIRED)
+find_package(svo_vio_common REQUIRED)
+find_package(vikit_ros REQUIRED)
+find_package(vikit_solver REQUIRED)
+find_package(Ceres REQUIRED)
+find_package(glog REQUIRED)
+find_package(opengv REQUIRED)
 
 # OpenMP
 find_package(OpenMP QUIET)
 if (OPENMP_FOUND)
   message(STATUS "OpenMP found")
-  add_definitions(-DUSE_OPENMP)
+  # add_definitions(-DUSE_OPENMP)
 endif ()
 
 #############
@@ -74,46 +90,83 @@ set(SOURCES
   src/map_alignment.cpp
   )
 
-cs_add_library(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+target_include_directories(${PROJECT_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(${PROJECT_NAME}
+  rclcpp
+  PCL
+  pcl_conversions
+  svo
+  svo_common
+  svo_vio_common
+  vikit_ros
+  vikit_solver
+  geometry_msgs
+  visualization_msgs
+  opengv
+  Ceres
+  glog
+)
+target_link_libraries(${PROJECT_NAME}
+  Eigen3::Eigen
+  opengv
+  Ceres::ceres
+  glog::glog
+)
+
 
 ##########
 # GTESTS #
 ##########
-catkin_add_gtest(test_backend_id test/test_backend_id.cpp)
+ament_add_gtest(test_backend_id test/test_backend_id.cpp)
 target_link_libraries(test_backend_id ${PROJECT_NAME})
 
-catkin_add_gtest(test_estimator test/test_estimator.cpp)
+ament_add_gtest(test_estimator test/test_estimator.cpp)
 target_link_libraries(test_estimator ${PROJECT_NAME})
 
-catkin_add_gtest(test_homogeneous_point_error test/test_homogeneous_point_error.cpp)
+ament_add_gtest(test_homogeneous_point_error test/test_homogeneous_point_error.cpp)
 target_link_libraries(test_homogeneous_point_error ${PROJECT_NAME})
 
-catkin_add_gtest(test_map test/test_map.cpp)
+ament_add_gtest(test_map test/test_map.cpp)
 target_link_libraries(test_map ${PROJECT_NAME})
 
-catkin_add_gtest(test_marginalization test/test_marginalization.cpp)
+ament_add_gtest(test_marginalization test/test_marginalization.cpp)
 target_link_libraries(test_marginalization ${PROJECT_NAME})
 
-catkin_add_gtest(test_pose_error test/test_pose_error.cpp)
+ament_add_gtest(test_pose_error test/test_pose_error.cpp)
 target_link_libraries(test_pose_error ${PROJECT_NAME})
 
-catkin_add_gtest(test_pose_local_parameterization test/test_pose_local_parameterization.cpp)
+ament_add_gtest(test_pose_local_parameterization test/test_pose_local_parameterization.cpp)
 target_link_libraries(test_pose_local_parameterization ${PROJECT_NAME})
 
-catkin_add_gtest(test_reprojection_error test/test_reprojection_error.cpp)
+ament_add_gtest(test_reprojection_error test/test_reprojection_error.cpp)
 target_link_libraries(test_reprojection_error ${PROJECT_NAME})
 
-catkin_add_gtest(test_relative_pose_error test/test_relative_pose_error.cpp)
+ament_add_gtest(test_relative_pose_error test/test_relative_pose_error.cpp)
 target_link_libraries(test_relative_pose_error ${PROJECT_NAME})
 
-catkin_add_gtest(test_speed_and_bias_error test/test_speed_and_bias_error.cpp)
+ament_add_gtest(test_speed_and_bias_error test/test_speed_and_bias_error.cpp)
 target_link_libraries(test_speed_and_bias_error ${PROJECT_NAME})
 
-catkin_add_gtest(test_imu_error test/test_imu_error.cpp)
+ament_add_gtest(test_imu_error test/test_imu_error.cpp)
 target_link_libraries(test_imu_error ${PROJECT_NAME})
 
 ##########
 # EXPORT #
 ##########
-cs_install()
-cs_export()
+install(TARGETS ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+ament_export_libraries(${PROJECT_NAME})
+ament_export_include_directories(include)
+ament_package()

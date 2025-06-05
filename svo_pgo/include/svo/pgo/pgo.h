@@ -7,45 +7,41 @@
  */
 #pragma once
 
-#include <thread>
-#include <mutex>
-#include <memory>
+// #include <ceres/manifold.h>
+#include <ceres/ceres.h>
+#include <svo/common/transformation.h>
+#include <svo/common/types.h>
+
 #include <deque>
 #include <fstream>
+#include <memory>
+#include <mutex>
+#include <thread>
 
-#include <ceres/ceres.h>
-#include <svo/common/types.h>
-#include <svo/common/transformation.h>
-
-#include "svo/pgo/ceres/types.h"
 #include "svo/pgo/ceres/pose_graph_3d_error_term.h"
+#include "svo/pgo/ceres/types.h"
 
-namespace svo
-{
-class Pgo
-{
-public:
-  Pgo()
-  {
+namespace svo {
+class Pgo {
+ public:
+  Pgo() {
     options_.max_num_iterations = 200;
     options_.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     has_updated_result_ = false;
     poses_ = new ceres::MapOfPoses;
   };
-  ~Pgo(){};
+  ~Pgo() {};
 
   void addPoseToPgoProblem(const Transformation t, const int frame_id);
-  void addSequentialConstraintToPgoProblem(const Transformation t_be,
-                                           const int frame_id_b,
+  void addSequentialConstraintToPgoProblem(const Transformation t_be, const int frame_id_b,
                                            const int frame_id_e);
-  void addLoopConstraintToPgoProblem(const Transformation t_be,
-                                     const int frame_id_b,
+  void addLoopConstraintToPgoProblem(const Transformation t_be, const int frame_id_b,
                                      const int frame_id_e);
   void updateKeyframeDatabase();
   void purgeProblem();
   /* The functions below are only used for testing */
-  void addConstraint(const Transformation& t_be, const int& frame_id_b,
-                     const int& frame_id_e, Eigen::Matrix<double, 6, 6>& info);
+  void addConstraint(const Transformation& t_be, const int& frame_id_b, const int& frame_id_e,
+                     Eigen::Matrix<double, 6, 6>& info);
   void solve();
   bool searchKfIdInQueue(int id);
   bool traceTimingData(std::string path);
@@ -58,14 +54,14 @@ public:
   std::vector<double> opt_timing_;
   std::vector<int> num_nodes_;
 
-private:
+ private:
   bool problem_lock_ = false;
   ceres::VectorOfConstraints constraints_;
   ceres::Problem problem_;
   ceres::Solver::Options options_;
   ceres::Solver::Summary summary_;
   ceres::LossFunction* loss_function_ = NULL;
-  ceres::LocalParameterization* quaternion_local_parameterization_ =
-      new ceres::EigenQuaternionParameterization;
+  std::shared_ptr<ceres::Manifold> quaternion_manifold_ =
+      std::make_shared<ceres::QuaternionManifold>();
 };
-}
+}  // namespace svo

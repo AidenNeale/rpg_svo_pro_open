@@ -5,7 +5,7 @@
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright notice,
  *     this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright notice,
@@ -40,9 +40,10 @@
 
 #pragma once
 
-#include <stdio.h>
-#include <iostream>
 #include <stdint.h>
+#include <stdio.h>
+
+#include <iostream>
 #pragma diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 // Eigen 3.2.7 uses std::binder1st and std::binder2nd which are deprecated since c++11
@@ -54,16 +55,10 @@ namespace svo {
 namespace ceres_backend {
 
 /// @brief Base class providing the interface for parameter blocks.
-class ParameterBlock
-{
+class ParameterBlock {
  public:
-
   /// @brief Default constructor, assumes not fixed and no local parameterisation.
-  ParameterBlock()
-      : id_(0)
-      , fixed_(false)
-      , local_parameterization_ptr_(nullptr)
-  {}
+  ParameterBlock() : id_(0), fixed_(false), local_parameterization_ptr_(nullptr) {}
 
   /// \brief Trivial destructor.
   virtual ~ParameterBlock() = default;
@@ -110,8 +105,7 @@ class ParameterBlock
   /// @param[in] x0 Variable.
   /// @param[in] Delta_Chi Perturbation.
   /// @param[out] x0_plus_Delta Perturbed x.
-  virtual void plus(const double* x0, const double* Delta_Chi,
-                    double* x0_plus_Delta) const = 0;
+  virtual void plus(const double* x0, const double* Delta_Chi, double* x0_plus_Delta) const = 0;
 
   /// \brief The jacobian of Plus(x, delta) w.r.t delta at delta = 0.
   /// @param[in] x0 Variable.
@@ -124,8 +118,7 @@ class ParameterBlock
   /// @param[in] x0_plus_Delta Perturbed variable.
   /// @param[out] Delta_Chi Minimal difference.
   /// \return True on success.
-  virtual void minus(const double* x0, const double* x0_plus_Delta,
-                     double* Delta_Chi) const = 0;
+  virtual void minus(const double* x0, const double* x0_plus_Delta, double* Delta_Chi) const = 0;
 
   /// \brief Computes the Jacobian from minimal space to naively
   ///        overparameterised space as used by ceres.
@@ -140,16 +133,13 @@ class ParameterBlock
    * @brief Set which local parameterisation object to use.
    * @param localParameterizationPtr The local parameterisation object to use.
    */
-  virtual void setLocalParameterizationPtr(
-      const ceres::LocalParameterization* localParameterizationPtr)
-  {
+  virtual void setLocalParameterizationPtr(const ceres::Manifold* localParameterizationPtr) {
     local_parameterization_ptr_ = localParameterizationPtr;
   }
   /**
    * @brief The local parameterisation object to use.
    */
-  virtual const ceres::LocalParameterization* localParameterizationPtr() const
-  {
+  virtual const ceres::Manifold* localParameterizationPtr() const {
     return local_parameterization_ptr_;
   }
   /// @}
@@ -162,7 +152,7 @@ class ParameterBlock
   /// @brief Whether or not this should be optimised at all (ceres::problem::setFixed)
   bool fixed_;
   /// @brief The local parameterisation object to use.
-  const ceres::LocalParameterization* local_parameterization_ptr_;
+  const ceres::Manifold* local_parameterization_ptr_;
 };
 
 }  // namespace ceres_backend

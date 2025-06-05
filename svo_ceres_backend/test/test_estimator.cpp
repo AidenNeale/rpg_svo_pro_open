@@ -32,18 +32,18 @@
  *    Modified: Zurich Eye
  *********************************************************************************/
 
-#include <gtest/gtest.h>
-
-#include <vikit/cameras.h>
-#include <vikit/cameras/camera_factory.h>
 #include <aslam/common/entrypoint.h>
+#include <gtest/gtest.h>
 #include <svo/common/camera.h>
 #include <svo/common/conversions.h>
-#include <svo/common/transformation.h>
 #include <svo/common/frame.h>
 #include <svo/common/imu_calibration.h>
-#include <svo/vio_common/test_utils.hpp>
+#include <svo/common/transformation.h>
+#include <vikit/cameras.h>
+#include <vikit/cameras/camera_factory.h>
+
 #include <opencv2/core/core.hpp>
+#include <svo/vio_common/test_utils.hpp>
 
 #include "svo/ceres_backend/estimator.hpp"
 
@@ -52,7 +52,7 @@ TEST(okvisTestSuite, Estimator) {
   // Parameters.
   constexpr double motion_duration = 10.0;  // 10 seconds motion
   constexpr double motion_speed_y = 1.0;
-  constexpr double imu_rate = 100.0;  // 100 Hz
+  constexpr double imu_rate = 100.0;     // 100 Hz
   constexpr double dt = 1.0 / imu_rate;  // time increments
   constexpr size_t imu_samples = motion_duration * imu_rate;
   constexpr bool deterministic = true;
@@ -87,8 +87,8 @@ TEST(okvisTestSuite, Estimator) {
   pinhole_intrin << f, f, 320.0, 240.0;
   cameras[0] = vk::cameras::factory::makePinholeCamera(pinhole_intrin, 640, 480);
   cameras[1] = vk::cameras::factory::makePinholeCamera(pinhole_intrin, 640, 480);
-  svo::CameraBundlePtr camera_rig = std::make_shared<svo::CameraBundle>(
-        T_CB_i, cameras, "test rig");
+  svo::CameraBundlePtr camera_rig =
+      std::make_shared<svo::CameraBundle>(T_CB_i, cameras, "test rig");
 
   // ---------------------------------------------------------------------------
   // Generate IMU measurements
@@ -96,45 +96,37 @@ TEST(okvisTestSuite, Estimator) {
   svo::SpeedAndBias speed_and_bias;
   speed_and_bias.setZero();
   speed_and_bias[1] = motion_speed_y;
-  svo::ImuMeasurements imu_measurements(imu_samples+1);
+  svo::ImuMeasurements imu_measurements(imu_samples + 1);
   Eigen::Matrix<double, 6, 1> nominal_imu_sensor_readings;
-  nominal_imu_sensor_readings
-      << Eigen::Vector3d(0.0, 0.0, imu_parameters.g), Eigen::Vector3d::Zero();
-  for (size_t i = imu_samples; i <=imu_samples; --i)
-  {
-    Eigen::Vector3d gyr = nominal_imu_sensor_readings.tail<3>()
-        + svo::test_utils::randomVectorNormalDistributed<3>(
-          deterministic, 0.0, imu_parameters.sigma_g_c * std::sqrt(dt));
-    Eigen::Vector3d acc = nominal_imu_sensor_readings.head<3>()
-        + svo::test_utils::randomVectorNormalDistributed<3>(
-          deterministic, 0.0, imu_parameters.sigma_a_c * std::sqrt(dt));
-    imu_measurements[i].timestamp_ = t0 + dt * (imu_samples-i);
+  nominal_imu_sensor_readings << Eigen::Vector3d(0.0, 0.0, imu_parameters.g),
+      Eigen::Vector3d::Zero();
+  for (size_t i = imu_samples; i <= imu_samples; --i) {
+    Eigen::Vector3d gyr = nominal_imu_sensor_readings.tail<3>() +
+                          svo::test_utils::randomVectorNormalDistributed<3>(
+                              deterministic, 0.0, imu_parameters.sigma_g_c * std::sqrt(dt));
+    Eigen::Vector3d acc = nominal_imu_sensor_readings.head<3>() +
+                          svo::test_utils::randomVectorNormalDistributed<3>(
+                              deterministic, 0.0, imu_parameters.sigma_a_c * std::sqrt(dt));
+    imu_measurements[i].timestamp_ = t0 + dt * (imu_samples - i);
     imu_measurements[i].linear_acceleration_ << acc;
     imu_measurements[i].angular_velocity_ << gyr;
   }
 
-
   // different cases of camera extrinsics;
-  for (size_t extrinsics_case = 0; extrinsics_case < 4; ++extrinsics_case)
-  {
-    LOG(INFO) << "case " << extrinsics_case % 2 << ", " << extrinsics_case / 2;
+  for (size_t extrinsics_case = 0; extrinsics_case < 4; ++extrinsics_case) {
+    std::cout << "case " << extrinsics_case % 2 << ", " << extrinsics_case / 2;
 
     // -------------------------------------------------------------------------
     // Estimator setup.
 
     // some parameters on how to do the online estimation:
     svo::ExtrinsicsEstimationParameters extrinsics_estimation_parameters;
-    extrinsics_estimation_parameters.sigma_absolute_translation = 1.0e-3
-        * (extrinsics_case % 2);
-    extrinsics_estimation_parameters.sigma_absolute_orientation = 1.0e-4
-        * (extrinsics_case % 2);
-    extrinsics_estimation_parameters.sigma_c_relative_translation = 1e-8
-        * (extrinsics_case / 2);
-    extrinsics_estimation_parameters.sigma_c_relative_orientation = 1e-7
-        * (extrinsics_case / 2);
-    svo::ExtrinsicsEstimationParametersVec
-        extrinsics_estimation_parameters_vec(2, extrinsics_estimation_parameters);
-
+    extrinsics_estimation_parameters.sigma_absolute_translation = 1.0e-3 * (extrinsics_case % 2);
+    extrinsics_estimation_parameters.sigma_absolute_orientation = 1.0e-4 * (extrinsics_case % 2);
+    extrinsics_estimation_parameters.sigma_c_relative_translation = 1e-8 * (extrinsics_case / 2);
+    extrinsics_estimation_parameters.sigma_c_relative_orientation = 1e-7 * (extrinsics_case / 2);
+    svo::ExtrinsicsEstimationParametersVec extrinsics_estimation_parameters_vec(
+        2, extrinsics_estimation_parameters);
 
     // create an Estimator
     svo::Estimator estimator;
@@ -153,22 +145,19 @@ TEST(okvisTestSuite, Estimator) {
     // -------------------------------------------------------------------------
     // create landmark grid
     const svo::Transformation T_WS_0_okvis;
-    std::vector<Eigen::Vector3d,
-        Eigen::aligned_allocator<Eigen::Vector3d> > landmark_positions;
+    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d> > landmark_positions;
     std::vector<int> track_ids;
     const double y_end = motion_duration * motion_speed_y + 10.0;
-    for (double y = -10.0; y <= y_end; y += 0.5)
-    {
-      for (double z = -10.0; z <= 10.0; z += 0.5)
-      {
+    for (double y = -10.0; y <= y_end; y += 0.5) {
+      for (double z = -10.0; z <= 10.0; z += 0.5) {
         landmark_positions.push_back(Eigen::Vector3d(3.0, y, z));
         track_ids.emplace_back(id_counter++);
         svo::PointPtr point =
-            std::make_shared<svo::Point>(track_ids.back(),
-                                         landmark_positions.back());
-        bool success =
-            estimator.addLandmark(point);
-        CHECK(success) << "Could not add landmark.";
+            std::make_shared<svo::Point>(track_ids.back(), landmark_positions.back());
+        bool success = estimator.addLandmark(point);
+        if (!success) {
+          throw std::runtime_error("Could not add landmark.");
+        }
       }
     }
 
@@ -177,71 +166,62 @@ TEST(okvisTestSuite, Estimator) {
     const size_t num_frames = 6;
     svo::Transformation T_WS_est;
     svo::SpeedAndBias speed_and_bias_est;
-    for (size_t k = 0; k < num_frames + 1; ++k)
-    {
+    for (size_t k = 0; k < num_frames + 1; ++k) {
       // calculate the transformation
       const double duration =
-          static_cast<double>(k) * motion_duration /
-          static_cast<double>(num_frames);
+          static_cast<double>(k) * motion_duration / static_cast<double>(num_frames);
       const double time = t0 + duration;
-      const int64_t time_ns = static_cast<int64_t>(
-            time / svo::common::conversions::kNanoSecondsToSeconds);
+      const int64_t time_ns =
+          static_cast<int64_t>(time / svo::common::conversions::kNanoSecondsToSeconds);
       const Eigen::Vector3d position = speed_and_bias.head<3>() * duration;
       svo::Transformation T_WB(position, svo::Quaternion());
 
       // assemble an n-frame
       const cv::Size image_size(640, 480);
       std::vector<svo::FramePtr> frames;
-      frames.push_back(std::make_shared<svo::Frame>(
-                         camera_rig->getCameraShared(0),
-                         cv::Mat(image_size,CV_8UC1),time_ns,1));
-      frames.push_back(std::make_shared<svo::Frame>(
-                         camera_rig->getCameraShared(1),
-                         cv::Mat(image_size,CV_8UC1),time_ns,1));
+      frames.push_back(std::make_shared<svo::Frame>(camera_rig->getCameraShared(0),
+                                                    cv::Mat(image_size, CV_8UC1), time_ns, 1));
+      frames.push_back(std::make_shared<svo::Frame>(camera_rig->getCameraShared(1),
+                                                    cv::Mat(image_size, CV_8UC1), time_ns, 1));
       svo::FrameBundlePtr nframe = std::make_shared<svo::FrameBundle>(frames);
       nframe->at(0)->setNFrameIndex(0u);
       nframe->at(1)->setNFrameIndex(1u);
       // add it in the window to create a new time instance
-      bool success = estimator.addStates(
-            nframe, imu_measurements,
-            time);
-      if(k % 3 == 0)
-      {
-        estimator.setKeyframe(svo::createNFrameId(nframe->getBundleId()),true);
+      bool success = estimator.addStates(nframe, imu_measurements, time);
+      if (k % 3 == 0) {
+        estimator.setKeyframe(svo::createNFrameId(nframe->getBundleId()), true);
       }
-      CHECK(success) << "addStates() failed!";
+      if (!success) {
+        throw std::runtime_error("addStates() failed!");
+      }
 
       success = estimator.get_T_WS(nframe->getBundleId(), T_WS_est);
-      CHECK(success) << "get_T_WS failed!";
-
+      if (!success) {
+        throw std::runtime_error("get_T_WS failed!");
+      }
 
       // now let's add also landmark observations
-      for (size_t j = 0; j < landmark_positions.size(); ++j)
-      {
-        for (size_t i = 0; i < nframe->size(); ++i)
-        {
+      for (size_t j = 0; j < landmark_positions.size(); ++j) {
+        for (size_t i = 0; i < nframe->size(); ++i) {
           svo::FramePtr frame = nframe->at(i);
           frame->resizeFeatureStorage(max_features);
           const svo::Camera& cam = camera_rig->getCamera(i);
           const Eigen::Vector3d point_C =
               camera_rig->get_T_C_B(i) * T_WB.inverse() * landmark_positions[j];
           svo::Keypoint projection;
-          //projectWithCheck(point_C);
-          if(point_C[2]<0.0) continue;
-          if (camera_rig->getCamera(i).project3(point_C,&projection)
-              && frame->numFeatures() < max_features)
-          {
+          // projectWithCheck(point_C);
+          if (point_C[2] < 0.0) continue;
+          if (camera_rig->getCamera(i).project3(point_C, &projection) &&
+              frame->numFeatures() < max_features) {
             Eigen::Vector2d measurement =
-                projection +
-                svo::test_utils::randomVectorNormalDistributed<2>(
-                  deterministic,
-                  0.0,
-                  keypoint_measurement_sigma);
+                projection + svo::test_utils::randomVectorNormalDistributed<2>(
+                                 deterministic, 0.0, keypoint_measurement_sigma);
             frame->px_vec_.col(frame->num_features_) = measurement;
-            Eigen::Vector3d *bearing = new Eigen::Vector3d();
-            success = cam.backProject3(Eigen::Ref<Eigen::Vector2d>(measurement)
-                                       ,bearing);
-            CHECK(success) << "backProject3 failed";
+            Eigen::Vector3d* bearing = new Eigen::Vector3d();
+            success = cam.backProject3(Eigen::Ref<Eigen::Vector2d>(measurement), bearing);
+            if (!success) {
+              throw std::runtime_error("backProject3 failed");
+            }
             frame->f_vec_.col(frame->num_features_) = *bearing;
             frame->level_vec_(frame->num_features_) = 1;
             frame->type_vec_[frame->num_features_] = svo::FeatureType::kCorner;
@@ -257,30 +237,29 @@ TEST(okvisTestSuite, Estimator) {
 
       // run the optimization
       estimator.optimize(10, 4, false);
-      LOG(INFO) << "Optimization done.";
+      std::cout << "Optimization done.";
     }
 
-    LOG(INFO) << "== TRY MARGINALIZATION ==";
+    std::cout << "== TRY MARGINALIZATION ==" << std::endl;
     // try out the marginalization strategy
     estimator.applyMarginalizationStrategy(2, 3);
     // run the optimization
-    LOG(INFO) << "== LAST OPTIMIZATION ==";
+    std::cout << "== LAST OPTIMIZATION ==" << std::endl;
     estimator.optimize(10, 4, false);
 
     // get the estimates
     estimator.get_T_WS(estimator.currentBundleId(), T_WS_est);
-    estimator.getSpeedAndBias(estimator.currentFrameId(),
-                              speed_and_bias_est);
+    estimator.getSpeedAndBias(estimator.currentFrameId(), speed_and_bias_est);
 
     // inspect convergence:
     svo::Transformation T_WS(
-          T_WS_0_okvis.getPosition() + speed_and_bias.head<3>() *motion_duration,
-          T_WS_0_okvis.getEigenQuaternion());
+        T_WS_0_okvis.getPosition() + speed_and_bias.head<3>() * motion_duration,
+        T_WS_0_okvis.getEigenQuaternion());
 
     EXPECT_LT((speed_and_bias_est - speed_and_bias).norm(), 0.04)
         << "speed and biases not close enough";
-    EXPECT_NEAR((T_WS.getEigenQuaternion() *
-                 T_WS_est.getEigenQuaternion().inverse()).w(), 1.0, 1e-6)
+    EXPECT_NEAR((T_WS.getEigenQuaternion() * T_WS_est.getEigenQuaternion().inverse()).w(), 1.0,
+                1e-6)
         << "quaternions not close enough";
     EXPECT_LT((T_WS.getPosition() - T_WS_est.getPosition()).norm(), 1e-1)
         << "translation not close enough";

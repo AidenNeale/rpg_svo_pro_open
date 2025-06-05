@@ -43,26 +43,24 @@
 #include <Eigen/Core>
 #pragma diagnostic pop
 
-#include <svo/common/transformation.h>
 #include <svo/common/point.h>
-#include <svo/vio_common/logging.hpp>
+#include <svo/common/transformation.h>
 #include <svo/global.h>
+
+#include <svo/vio_common/logging.hpp>
 
 namespace svo {
 
 //------------------------------------------------------------------------------
 /// \brief Struct to define the behavior of the camera extrinsics.
-struct ExtrinsicsEstimationParameters
-{
+struct ExtrinsicsEstimationParameters {
   // set to 0 in order to turn off
   /// \brief Default Constructor -- fixed camera extrinsics.
   ExtrinsicsEstimationParameters()
       : sigma_absolute_translation(0.0),
         sigma_absolute_orientation(0.0),
         sigma_c_relative_translation(0.0),
-        sigma_c_relative_orientation(0.0)
-  {
-  }
+        sigma_c_relative_orientation(0.0) {}
 
   /**
    * @brief Constructor.
@@ -78,29 +76,23 @@ struct ExtrinsicsEstimationParameters
       : sigma_absolute_translation(sigma_absolute_translation),
         sigma_absolute_orientation(sigma_absolute_orientation),
         sigma_c_relative_translation(sigma_c_relative_translation),
-        sigma_c_relative_orientation(sigma_c_relative_orientation)
-  {
+        sigma_c_relative_orientation(sigma_c_relative_orientation) {}
+
+  inline bool isExtrinsicsFixed() const {
+    return absoluteTranslationVar() < 1.0e-16 && absoluteRotationVar() < 1.0e-16;
   }
 
-  inline bool isExtrinsicsFixed() const
-  {
-    return absoluteTranslationVar() < 1.0e-16 &&
-        absoluteRotationVar() < 1.0e-16;
-  }
-
-  inline double absoluteTranslationVar() const
-  {
+  inline double absoluteTranslationVar() const {
     return sigma_absolute_translation * sigma_absolute_translation;
   }
 
-  inline double absoluteRotationVar() const
-  {
+  inline double absoluteRotationVar() const {
     return sigma_absolute_orientation * sigma_absolute_orientation;
   }
 
   // absolute (prior) w.r.t frame S
-  double sigma_absolute_translation; ///< Absolute translation stdev. [m]
-  double sigma_absolute_orientation; ///< Absolute orientation stdev. [rad]
+  double sigma_absolute_translation;  ///< Absolute translation stdev. [m]
+  double sigma_absolute_orientation;  ///< Absolute orientation stdev. [rad]
 
   // relative (temporal)
   double sigma_c_relative_translation;
@@ -110,8 +102,8 @@ struct ExtrinsicsEstimationParameters
 };
 
 typedef std::vector<ExtrinsicsEstimationParameters,
-                    Eigen::aligned_allocator<ExtrinsicsEstimationParameters> >
-        ExtrinsicsEstimationParametersVec;
+                    Eigen::aligned_allocator<ExtrinsicsEstimationParameters>>
+    ExtrinsicsEstimationParametersVec;
 
 // -----------------------------------------------------------------------------
 /*!
@@ -120,20 +112,19 @@ typedef std::vector<ExtrinsicsEstimationParameters,
  * A simple struct to specify properties of an IMU.
  *
  */
-struct ImuParameters
-{
+struct ImuParameters {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  double a_max = 150;  ///< Accelerometer saturation. [m/s^2]
-  double g_max = 7.8;  ///< Gyroscope saturation. [rad/s]
+  double a_max = 150;        ///< Accelerometer saturation. [m/s^2]
+  double g_max = 7.8;        ///< Gyroscope saturation. [rad/s]
   double sigma_g_c = 0.001;  ///< Gyroscope noise density. [rad/s*1/sqrt(Hz)]
   double sigma_bg = 0.01;
   ///< Initial gyroscope bias uncertainty. [rad/s*1/sqrt(Hz)]
   double sigma_a_c = 0.02;  ///< Accelerometer noise density. [m/s^2*1/sqrt(Hz)]
   double sigma_ba = 0.1;
   ///< Initial accelerometer bias uncertainty. [m/s^2*1/sqrt(Hz)]
-  double sigma_gw_c; ///< Gyroscope drift noise density. [rad/s^2*1/sqrt(Hz)]
-  double sigma_aw_c; ///< Accelerometer drift noise density. [m/s^3*1/sqrt(Hz)]
-  double g;  ///< Earth acceleration. [m/s^2]
+  double sigma_gw_c;  ///< Gyroscope drift noise density. [rad/s^2*1/sqrt(Hz)]
+  double sigma_aw_c;  ///< Accelerometer drift noise density. [m/s^3*1/sqrt(Hz)]
+  double g;           ///< Earth acceleration. [m/s^2]
   Eigen::Vector3d a0 = Eigen::Vector3d::Zero();
   ///< Mean of the prior acceleration bias. [m/s^2*1/sqrt(Hz)]
   double rate = 200;  ///< IMU rate. [Hz].
@@ -143,13 +134,7 @@ struct ImuParameters
 
 // -----------------------------------------------------------------------------
 // IDs
-enum class IdType : uint8_t
-{
-  NFrame = 0,
-  Landmark = 1,
-  ImuStates = 2,
-  Extrinsics = 3
-};
+enum class IdType : uint8_t { NFrame = 0, Landmark = 1, ImuStates = 2, Extrinsics = 3 };
 
 //! The Backend ID for multiple types.
 //! Memory layout for types {Frame, IMU state}:
@@ -168,126 +153,120 @@ enum class IdType : uint8_t
 //! Byte 0: IdType
 //! Byte 1-3: zero
 //! Byte 4-7: 32 bit Track ID
-class BackendId
-{
-public:
+class BackendId {
+ public:
   BackendId() = default;
   explicit BackendId(uint64_t id) : id_(id) {}
 
-  uint64_t asInteger() const
-  {
-    return id_;
-  }
+  uint64_t asInteger() const { return id_; }
 
-  IdType type() const
-  {
+  IdType type() const {
     // The first byte represents the type.
     return static_cast<IdType>(id_ >> 56);
   }
 
-  int32_t bundleId() const
-  {
-    DEBUG_CHECK(type() != IdType::Landmark)
-        << "Landmarks do not have a bundle ID.";
+  int32_t bundleId() const {
+    if (type() == IdType::Landmark) {
+      throw std::runtime_error("Landmarks do not have a bundle ID.");
+    }
     // The bundle ID is byte 2 -> 6 in id.
     return static_cast<int32_t>((id_ >> 16) & 0xFFFFFFFF);
   }
 
-  uint32_t trackId() const
-  {
-    DEBUG_CHECK(type() == IdType::Landmark);
+  uint32_t trackId() const {
+    if (type() != IdType::Landmark) {
+      throw std::runtime_error("Only landmarks have a track ID.");
+    }
     // In case of a landmark, the last 4 bytes are the track ID.
     return static_cast<uint32_t>(id_ & 0xFFFFFFFF);
   }
 
-  uint16_t nFrameHandle() const
-  {
-    DEBUG_CHECK(type() == IdType::NFrame ||
-                type() == IdType::ImuStates ||
-                type() == IdType::Extrinsics);
+  uint16_t nFrameHandle() const {
+    if (type() != IdType::NFrame || type() != IdType::ImuStates || type() != IdType::Extrinsics) {
+      throw std::runtime_error("Only NFrame, IMU states and Extrinsics have a handle.");
+    }
     // In case of an NFrame, the last 2 bytes are the handle.
     return static_cast<uint16_t>(id_ & 0xFFFF);
   }
 
-  uint8_t cameraIndex() const
-  {
-    DEBUG_CHECK(type() == IdType::Extrinsics);
-   // The second byte is the camara index.
+  uint8_t cameraIndex() const {
+    if (type() != IdType::Extrinsics) {
+      throw std::runtime_error("Only Extrinsics have a camera index.");
+    }
+    // The second byte is the camara index.
     return static_cast<uint8_t>((id_ >> 48) & 0x00000FF);
   }
 
-  bool valid() const
-  {
-    return id_ != 0;
+  bool valid() const { return id_ != 0; }
+
+  std::string toString() const {
+    std::ostringstream oss;
+    oss << std::hex << id_ << std::dec;
+    return oss.str();
   }
 
-private:
+ private:
   uint64_t id_{0};
 };
 
 // Factories
-inline BackendId createLandmarkId(int track_id)
-{
+inline BackendId createLandmarkId(int track_id) {
   return BackendId(static_cast<uint64_t>(track_id) |
                    (static_cast<uint64_t>(IdType::Landmark) << 56));
 }
 
-inline BackendId createNFrameId(int32_t bundle_id)
-{
-  CHECK_GE(bundle_id, 0);
+inline BackendId createNFrameId(int32_t bundle_id) {
+  if (bundle_id < 0) {
+    throw std::runtime_error("Bundle ID must be non-negative.");
+  }
   return BackendId((static_cast<uint64_t>(bundle_id) << 16) |
                    (static_cast<uint64_t>(IdType::NFrame) << 56));
 }
 
-inline BackendId createExtrinsicsId(uint8_t camera_index,
-                                    int32_t bundle_id){
-  return BackendId((static_cast<uint64_t>(
-                      static_cast<uint32_t>(bundle_id)) << 16) |
+inline BackendId createExtrinsicsId(uint8_t camera_index, int32_t bundle_id) {
+  return BackendId((static_cast<uint64_t>(static_cast<uint32_t>(bundle_id)) << 16) |
                    (static_cast<uint64_t>(camera_index) << 48) |
                    (static_cast<uint64_t>(IdType::Extrinsics) << 56));
 }
 
-inline BackendId createImuStateId(int32_t bundle_id)
-{
-  return BackendId((static_cast<uint64_t>(
-                      static_cast<uint32_t>(bundle_id)) << 16) |
+inline BackendId createImuStateId(int32_t bundle_id) {
+  return BackendId((static_cast<uint64_t>(static_cast<uint32_t>(bundle_id)) << 16) |
                    (static_cast<uint64_t>(IdType::ImuStates) << 56));
 }
 
-inline BackendId changeIdType(BackendId id, IdType type, size_t cam_index = 0)
-{
-  DEBUG_CHECK(id.type() != IdType::Landmark);
-  DEBUG_CHECK(type != IdType::Landmark);
-  DEBUG_CHECK(cam_index == 0 || type == IdType::Extrinsics);
+inline BackendId changeIdType(BackendId id, IdType type, size_t cam_index = 0) {
+  if (id.type() == IdType::Landmark) {
+    throw std::runtime_error("Cannot change type of a landmark ID.");
+  }
+  if (type == IdType::Landmark) {
+    throw std::runtime_error("Cannot change to Landmark type.");
+  }
+  if (cam_index != 0 && type != IdType::Extrinsics) {
+    throw std::runtime_error("Changing to non-extrinsics type with camera index is not allowed.");
+  }
   // Last 6 bytes remain the same.
-  return BackendId((id.asInteger() & 0xFFFFFFFFFFFF) |
-                   (static_cast<uint64_t>(cam_index) << 48) |
+  return BackendId((id.asInteger() & 0xFFFFFFFFFFFF) | (static_cast<uint64_t>(cam_index) << 48) |
                    (static_cast<uint64_t>(type) << 56));
 }
 
 // Comparison operator for use in maps.
-inline bool operator<(const BackendId& lhs, const BackendId& rhs)
-{
+inline bool operator<(const BackendId& lhs, const BackendId& rhs) {
   return lhs.asInteger() < rhs.asInteger();
 }
 
-inline bool operator==(const BackendId& lhs, const BackendId& rhs)
-{
+inline bool operator==(const BackendId& lhs, const BackendId& rhs) {
   return lhs.asInteger() == rhs.asInteger();
 }
 
-inline bool operator!=(const BackendId& lhs, const BackendId& rhs)
-{
+inline bool operator!=(const BackendId& lhs, const BackendId& rhs) {
   return lhs.asInteger() != rhs.asInteger();
 }
 
-inline bool operator>=(const BackendId& lhs, const BackendId& rhs)
-{
+inline bool operator>=(const BackendId& lhs, const BackendId& rhs) {
   return lhs.asInteger() >= rhs.asInteger();
 }
 
-inline std::ostream& operator<<(std::ostream& out, const BackendId& id)
-{
+inline std::ostream& operator<<(std::ostream& out, const BackendId& id) {
   out << std::hex << id.asInteger() << std::dec;
   return out;
 }
@@ -296,26 +275,20 @@ inline std::ostream& operator<<(std::ostream& out, const BackendId& id)
 /**
  * @brief A type to store information about a point in the world map.
  */
-struct MapPoint
-{
+struct MapPoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   /// \brief Default constructor. Point is nullptr.
-  MapPoint()
-      : point(nullptr), fixed_position(false)
-  {}
+  MapPoint() : point(nullptr), fixed_position(false) {}
   /**
    * @brief Constructor.
    * @param point     Pointer to underlying svo::Point
    */
-  MapPoint(const PointPtr& point)
-    : point(point), fixed_position(false)
-  {
+  MapPoint(const PointPtr& point) : point(point), fixed_position(false) {
     hom_coordinates << point->pos(), 1;
   }
 
-  Eigen::Vector4d hom_coordinates; ///< Continuosly updates position of point
-
+  Eigen::Vector4d hom_coordinates;  ///< Continuosly updates position of point
 
   //! Pointer to the point. The position is not updated inside backend
   //! because of possible multithreading conflicts.
@@ -329,12 +302,13 @@ struct MapPoint
   bool fixed_position;
 };
 
-typedef std::vector<MapPoint, Eigen::aligned_allocator<MapPoint> > MapPointVector;
+typedef std::vector<MapPoint, Eigen::aligned_allocator<MapPoint>> MapPointVector;
 typedef std::map<BackendId, MapPoint, std::less<BackendId>,
-  Eigen::aligned_allocator<std::pair<const BackendId, MapPoint>> > PointMap;
+                 Eigen::aligned_allocator<std::pair<const BackendId, MapPoint>>>
+    PointMap;
 
 //------------------------------------------------------------------------------
 // [velocity, gyro biases, accel biases]
 typedef Eigen::Matrix<double, 9, 1> SpeedAndBias;
 
-} // namespace svo
+}  // namespace svo

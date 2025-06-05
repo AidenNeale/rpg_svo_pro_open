@@ -1,12 +1,12 @@
 #pragma once
 
-#include <string>
-#include <memory>
-#include <Eigen/Core>
-#include <opencv2/core/core.hpp>
-
 #include <aslam/common/macros.h>
 #include <aslam/common/pose-types.h>
+
+#include <Eigen/Core>
+#include <memory>
+#include <opencv2/core/core.hpp>
+#include <string>
 
 namespace vk {
 
@@ -47,8 +47,8 @@ struct ProjectionResult {
   ///        is visible. Simplifies the check for a successful projection.
   ///        Example usage:
   /// @code
-  ///          aslam::ProjectionResult ret = camera_->project3(Eigen::Vector3d(0, 0, -10), &keypoint);
-  ///          if(ret) std::cout << "Projection was successful!\n";
+  ///          aslam::ProjectionResult ret = camera_->project3(Eigen::Vector3d(0, 0, -10),
+  ///          &keypoint); if(ret) std::cout << "Projection was successful!\n";
   /// @endcode
   explicit operator bool() const { return isKeypointVisible(); }
 
@@ -59,7 +59,7 @@ struct ProjectionResult {
   bool operator==(const ProjectionResult::Status& other) const { return status_ == other; }
 
   /// \brief Convenience function to print the state using streams.
-  friend std::ostream& operator<< (std::ostream& out, const ProjectionResult& state);
+  friend std::ostream& operator<<(std::ostream& out, const ProjectionResult& state);
 
   /// \brief Check whether the projection was successful and the point is visible in the image.
   bool isKeypointVisible() const { return (status_ == Status::KEYPOINT_VISIBLE); }
@@ -67,8 +67,9 @@ struct ProjectionResult {
   /// \brief Returns the exact state of the projection operation.
   ///        Example usage:
   /// @code
-  ///          aslam::ProjectionResult ret = camera_->project3(Eigen::Vector3d(0, 0, -1), &keypoint);
-  ///          if(ret.getDetailedStatus() == aslam::ProjectionResult::Status::KEYPOINT_OUTSIDE_IMAGE_BOX)
+  ///          aslam::ProjectionResult ret = camera_->project3(Eigen::Vector3d(0, 0, -1),
+  ///          &keypoint); if(ret.getDetailedStatus() ==
+  ///          aslam::ProjectionResult::Status::KEYPOINT_OUTSIDE_IMAGE_BOX)
   ///            std::cout << "Point behind camera! Lets do something...\n";
   /// @endcode
   Status getDetailedStatus() const { return status_; }
@@ -78,17 +79,11 @@ struct ProjectionResult {
   Status status_;
 };
 
-class CameraGeometryBase
-{
-public:
+class CameraGeometryBase {
+ public:
   ASLAM_POINTER_TYPEDEFS(CameraGeometryBase);
 
-  enum class Type {
-    kPinhole = 0,
-    kUnifiedProjection = 1,
-    kOmni = 2,
-    kEqFisheye = 3
-  };
+  enum class Type { kPinhole = 0, kUnifiedProjection = 1, kOmni = 2, kEqFisheye = 3 };
 
   /// Default constructor
   CameraGeometryBase(const int width, const int height);
@@ -100,19 +95,17 @@ public:
 
   /// Computes bearing vector from pixel coordinates. Z-component of the returned
   /// bearing vector is 1.0. IMPORTANT: returned vector is NOT of unit length!
-  virtual bool backProject3(
-      const Eigen::Ref<const Eigen::Vector2d>& keypoint,
-      Eigen::Vector3d* out_point_3d) const = 0;
+  virtual bool backProject3(const Eigen::Ref<const Eigen::Vector2d>& keypoint,
+                            Eigen::Vector3d* out_point_3d) const = 0;
   /// Override taking multiple keypoints. Derived classes are free to make a
   /// vectorized implementation for speedup.
-  virtual void backProject3(
-      const Eigen::Ref<const Eigen::Matrix2Xd>& keypoints,
-      Eigen::Matrix3Xd* out_bearing_vectors, std::vector<bool>* success) const;
+  virtual void backProject3(const Eigen::Ref<const Eigen::Matrix2Xd>& keypoints,
+                            Eigen::Matrix3Xd* out_bearing_vectors,
+                            std::vector<bool>* success) const;
 
   /// Computes pixel coordinates from bearing vector with Jacobian w.r.t. point.
   virtual const ProjectionResult project3(
-      const Eigen::Ref<const Eigen::Vector3d>& point_3d,
-      Eigen::Vector2d* out_keypoint,
+      const Eigen::Ref<const Eigen::Vector3d>& point_3d, Eigen::Vector2d* out_keypoint,
       Eigen::Matrix<double, 2, 3>* out_jacobian_point = nullptr) const = 0;
 
   /// Print camera info
@@ -146,15 +139,14 @@ public:
   uint32_t imageHeight() const { return height_; }
 
   /// Return if a given keypoint is inside the imaging box of the camera.
-  template<typename DerivedKeyPoint>
+  template <typename DerivedKeyPoint>
   bool isKeypointVisible(const Eigen::MatrixBase<DerivedKeyPoint>& keypoint) const;
 
   /// Return if a given keypoint is within the specified margin to the boundary
   /// of the imaging box of the camera.
-  template<typename DerivedKeyPoint>
-  bool isKeypointVisibleWithMargin(
-      const Eigen::MatrixBase<DerivedKeyPoint>& keypoint,
-      typename DerivedKeyPoint::Scalar margin) const;
+  template <typename DerivedKeyPoint>
+  bool isKeypointVisibleWithMargin(const Eigen::MatrixBase<DerivedKeyPoint>& keypoint,
+                                   typename DerivedKeyPoint::Scalar margin) const;
 
   /// Set the mask. Masks must be the same size as the image and they follow the same
   /// convention as OpenCV: 0 == masked, nonzero == valid.
@@ -178,7 +170,7 @@ public:
   /// Creates a random non-masked keypoint.
   Eigen::Vector2d createRandomKeypoint() const;
 
-protected:
+ protected:
   int width_;
   int height_;
   std::string label_;
@@ -186,7 +178,7 @@ protected:
   cv::Mat mask_;
 };
 
-} // namespace cameras
-} // namespace vk
+}  // namespace cameras
+}  // namespace vk
 
 #include "implementation/camera_geometry_base.hpp"

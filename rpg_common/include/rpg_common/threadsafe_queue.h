@@ -1,22 +1,19 @@
 #pragma once
 
 #include <condition_variable>
+#include <iostream>
 #include <mutex>
 #include <queue>
 #include <vector>
 
-#include <glog/logging.h>
-
 namespace rpg_common {
 
-template<typename DataType>
-class ThreadSafeQueue
-{
+template <typename DataType>
+class ThreadSafeQueue {
  public:
   ThreadSafeQueue() : warn_if_has_backlog_(false), shutdown_(false) {}
 
-  void push(const DataType& item)
-  {
+  void push(const DataType& item) {
     {
       std::lock_guard<std::mutex> lock(mutex_);
       data_.push(item);
@@ -24,16 +21,14 @@ class ThreadSafeQueue
     cv_push_.notify_all();
   }
 
-  bool tryPopNow(DataType* item)
-  {
-    CHECK_NOTNULL(item);
+  bool tryPopNow(DataType* item) {
+    if (!item) {
+      throw std::invalid_argument("Item pointer is null");
+    }
     std::lock_guard<std::mutex> lock(mutex_);
-    if (data_.empty())
-    {
+    if (data_.empty()) {
       return false;
-    }
-    else
-    {
+    } else {
       *item = data_.front();
       data_.pop();
       cv_pop_.notify_all();
@@ -42,16 +37,14 @@ class ThreadSafeQueue
   }
 
   // Returns false if queue has been shut down.
-  bool waitAndPop(DataType* item)
-  {
-    CHECK_NOTNULL(item);
-    std::unique_lock<std::mutex> lock(mutex_);
-    if (!wait(&lock))
-    {
-      return false;
+  bool waitAndPop(DataType* item) {
+    if (!item) {
+      throw std::invalid_argument("Item pointer is null");
     }
-    else
-    {
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (!wait(&lock)) {
+      return false;
+    } else {
       *item = data_.front();
       data_.pop();
       cv_pop_.notify_all();
@@ -60,16 +53,14 @@ class ThreadSafeQueue
   }
 
   // Returns false if queue has been shut down.
-  bool skipToLatest(DataType* item)
-  {
-    CHECK_NOTNULL(item);
-    std::unique_lock<std::mutex> lock(mutex_);
-    if (!wait(&lock))
-    {
-      return false;
+  bool skipToLatest(DataType* item) {
+    if (!item) {
+      throw std::invalid_argument("Item pointer is null");
     }
-    else
-    {
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (!wait(&lock)) {
+      return false;
+    } else {
       *item = data_.back();
       while (!data_.empty()) {
         data_.pop();
@@ -80,16 +71,15 @@ class ThreadSafeQueue
   }
 
   // Returns false if queue has been shut down.
-  bool waitAndPopAvailable(std::vector<DataType>* items)
-  {
-    CHECK_NOTNULL(items)->clear();
-    std::unique_lock<std::mutex> lock(mutex_);
-    if (!wait(&lock))
-    {
-      return false;
+  bool waitAndPopAvailable(std::vector<DataType>* items) {
+    if (!items) {
+      throw std::invalid_argument("Items pointer is null");
     }
-    else
-    {
+    items->clear();
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (!wait(&lock)) {
+      return false;
+    } else {
       items->reserve(data_.size());
       while (!data_.empty()) {
         items->push_back(data_.front());
@@ -100,8 +90,7 @@ class ThreadSafeQueue
     }
   }
 
-  void shutdown()
-  {
+  void shutdown() {
     {
       std::lock_guard<std::mutex> lock(mutex_);
       shutdown_ = true;
@@ -110,20 +99,16 @@ class ThreadSafeQueue
     cv_pop_.notify_all();
   }
 
-  void printBacklogWarningsWithTag(const std::string& tag)
-  {
+  void printBacklogWarningsWithTag(const std::string& tag) {
     warn_if_has_backlog_ = true;
     backlog_warn_tag_ = tag;
   }
 
   // Returns false if shutdown has been requested.
-  bool waitUntilEmpty()
-  {
+  bool waitUntilEmpty() {
     std::unique_lock<std::mutex> lock(mutex_);
-    cv_pop_.wait(
-        lock, [this] { return data_.empty() || shutdown_; });
-    if (shutdown_)
-    {
+    cv_pop_.wait(lock, [this] { return data_.empty() || shutdown_; });
+    if (shutdown_) {
       return false;
     }
     return true;
@@ -131,17 +116,15 @@ class ThreadSafeQueue
 
  private:
   // Returns false if shutdown has been requested.
-  bool wait(std::unique_lock<std::mutex>* lock)
-  {
-    CHECK_NOTNULL(lock);
-    if (warn_if_has_backlog_ && !data_.empty())
-    {
-      LOG(WARNING) << "Backlog in queue \"" << backlog_warn_tag_ << "\"";
+  bool wait(std::unique_lock<std::mutex>* lock) {
+    if (!lock) {
+      throw std::invalid_argument("Lock pointer is null");
     }
-    cv_push_.wait(
-        *lock, [this] { return !data_.empty() || shutdown_; });
-    if (shutdown_)
-    {
+    if (warn_if_has_backlog_ && !data_.empty()) {
+      std::cout << "Backlog in queue \"" << backlog_warn_tag_ << "\"";
+    }
+    cv_push_.wait(*lock, [this] { return !data_.empty() || shutdown_; });
+    if (shutdown_) {
       return false;
     }
     return true;

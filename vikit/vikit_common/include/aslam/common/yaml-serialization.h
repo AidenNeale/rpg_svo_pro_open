@@ -1,6 +1,8 @@
 #ifndef ASLAM_CV_COMMON_YAML_SERIALIZATION_H_
 #define ASLAM_CV_COMMON_YAML_SERIALIZATION_H_
 
+#include <aslam/common/memory.h>
+
 #include <fstream>  // NOLINT
 #include <list>
 #include <queue>
@@ -9,9 +11,6 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
-#include <aslam/common/memory.h>
-#include <glog/logging.h>
 
 #include "yaml-serialization-eigen.h"
 
@@ -22,29 +21,30 @@ namespace YAML {
 /// \param[in] key The key used to dereference the node (node[key]).
 /// \param[out] value The return value.
 /// \returns True if the value was filled in successfully. False otherwise.
-template<typename ValueType>
+template <typename ValueType>
 bool safeGet(const YAML::Node& node, const std::string& key, ValueType* value) {
-  CHECK_NOTNULL(value);
+  if (!value) {
+    throw std::runtime_error("safeGet: value is null");
+  }
   bool success = false;
-  if(!node.IsMap()) {
-    LOG(ERROR) << "Unable to get Node[\"" << key << "\"] because the node is not a map";
+  if (!node.IsMap()) {
+    std::cerr << "Unable to get Node[\"" << key << "\"] because the node is not a map";
   } else {
     const YAML::Node sub_node = node[key];
-    if(sub_node) {
+    if (sub_node) {
       try {
         *value = sub_node.as<ValueType>();
         success = true;
-      } catch(const YAML::Exception& e) {
-        LOG(ERROR) << "Error getting key \"" << key << "\" as type "
-            << typeid(ValueType).name() << ": " << e.what();
+      } catch (const YAML::Exception& e) {
+        std::cerr << "Error getting key \"" << key << "\" as type " << typeid(ValueType).name()
+                  << ": " << e.what();
       }
     } else {
-      LOG(ERROR) << "Key \"" << key << "\" does not exist";
+      std::cerr << "Key \"" << key << "\" does not exist";
     }
   }
   return success;
 }
-
 
 template <class ValueType>
 struct convert<std::queue<ValueType> > {
@@ -61,7 +61,9 @@ struct convert<std::queue<ValueType> > {
   }
 
   static bool decode(const Node& node, std::queue<ValueType>& queue) {
-    CHECK(node.IsSequence());
+    if (!node.IsSequence()) {
+      throw std::runtime_error("YAML decode: node is not a sequence");
+    }
     for (size_t i = 0; i < node.size(); ++i) {
       ValueType tmp = node[i].as<ValueType>();
       queue.push(tmp);
@@ -82,7 +84,9 @@ struct convert<std::unordered_set<KeyType> > {
 
   static bool decode(const Node& node, std::unordered_set<KeyType>& set) {
     set.clear();
-    CHECK(node.IsSequence());
+    if (!node.IsSequence()) {
+      throw std::runtime_error("YAML decode: node is not a sequence");
+    }
     for (YAML::const_iterator it = node.begin(); it != node.end(); ++it) {
       set.insert(it->as<KeyType>());
     }
@@ -100,8 +104,7 @@ struct convert<std::unordered_map<KeyType, ValueType> > {
     return node;
   }
 
-  static bool decode(const Node& node,
-                     std::unordered_map<KeyType, ValueType>& map) {
+  static bool decode(const Node& node, std::unordered_map<KeyType, ValueType>& map) {
     map.clear();
     for (YAML::const_iterator it = node.begin(); it != node.end(); ++it) {
       map[it->first.as<KeyType>()] = it->second.as<ValueType>();
@@ -112,7 +115,9 @@ struct convert<std::unordered_map<KeyType, ValueType> > {
 
 template <typename ObjectType>
 void Save(const ObjectType& object, std::ostream* ofs) {
-  CHECK_NOTNULL(ofs);
+  if (!ofs) {
+    throw std::runtime_error("Save: output stream is null");
+  }
   assert(ofs->good());
   YAML::Node out;
   out = object;
@@ -127,7 +132,9 @@ void Save(const T& object, const std::string& filename) {
 
 template <typename ObjectType>
 bool Load(const std::string& filename, ObjectType* object) {
-  CHECK_NOTNULL(object);
+  if (!object) {
+    throw std::runtime_error("Load: object is null");
+  }
   std::ifstream ifs(filename.c_str());
   if (!ifs.good()) {
     return false;
@@ -137,9 +144,8 @@ bool Load(const std::string& filename, ObjectType* object) {
     YAML::Node doc = YAML::LoadFile(filename.c_str());
     (*object) = doc.as<ObjectType>();
     return true;
-  }
-  catch (const std::exception& e) {  // NOLINT
-    LOG(ERROR) << "Encountered exception while reading yaml " << e.what();
+  } catch (const std::exception& e) {  // NOLINT
+    std::cerr << "Encountered exception while reading yaml " << e.what();
     return false;
   }
 }

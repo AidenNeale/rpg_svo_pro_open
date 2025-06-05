@@ -1,39 +1,37 @@
 #include <gflags/gflags.h>
-#include <ros/package.h>
 
 // svo
-#include <svo/test_utils/synthetic_dataset.h>
-#include <svo/common/frame.h>
 #include <svo/common/camera.h>
-#include <svo/direct/matcher.h>
+#include <svo/common/frame.h>
+#include <svo/direct/elder_zucker.h>
 #include <svo/direct/feature_detection.h>
 #include <svo/direct/feature_detection_utils.h>
+#include <svo/direct/matcher.h>
 #include <svo/direct/patch_utils.h>
 #include <svo/direct/patch_warp.h>
-#include <svo/direct/elder_zucker.h>
+#include <svo/test_utils/synthetic_dataset.h>
+
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 // others
-#include <opencv2/highgui/highgui.hpp> // imread
+#include <opencv2/highgui/highgui.hpp>  // imread
 #include <opencv2/imgproc/imgproc.hpp>
 
 namespace {
 
 using namespace svo;
 
-void detectNonlinearDiffusionEdges(const ImgPyr& img_pyr)
-{
+void detectNonlinearDiffusionEdges(const ImgPyr& img_pyr) {
   int pyr_level = 0;
   float dt = 0.2;
-  float T  = 10.0;
+  float T = 10.0;
   int num_iter = T / dt;
   int canny_low_threshold = 20;
   int canny_ratio = 3;
 
-
   cv::Mat src_gray = img_pyr[0];
   cv::Mat dest1, dest2, dest3;
   int ratio = 3;
-
 
   // ---------------------------------------------------------------------------
   // Gaussian Blurring (Linear Diffusion)
@@ -44,9 +42,9 @@ void detectNonlinearDiffusionEdges(const ImgPyr& img_pyr)
   cv::GaussianBlur(src_gray, dest3, cv::Size(17, 17), 0);
 
   // Canny detector
-  cv::Canny(dest1, dest1, canny_low_threshold, canny_low_threshold*ratio);
-  cv::Canny(dest2, dest2, canny_low_threshold, canny_low_threshold*ratio);
-  cv::Canny(dest3, dest3, canny_low_threshold, canny_low_threshold*ratio);
+  cv::Canny(dest1, dest1, canny_low_threshold, canny_low_threshold * ratio);
+  cv::Canny(dest2, dest2, canny_low_threshold, canny_low_threshold * ratio);
+  cv::Canny(dest3, dest3, canny_low_threshold, canny_low_threshold * ratio);
 
   cv::imshow("guillermo edges1", dest1);
   cv::imshow("guillermo edges2", dest2);
@@ -56,20 +54,18 @@ void detectNonlinearDiffusionEdges(const ImgPyr& img_pyr)
   // Nonlinear Diffusion
 
   cv::Mat img_32f;
-  img_pyr.at(pyr_level).convertTo(img_32f, CV_32FC1, 1.0f/255.0);
-  cv::Mat kernel_deriv_x  = (cv::Mat_<float>(1,3) << -0.5, 0.0, 0.5);
-  cv::Mat kernel_deriv_xx = (cv::Mat_<float>(1,3) << 1.0, -2.0, 1.0);
-  cv::Mat kernel_deriv_xy = (cv::Mat_<float>(3,3) << 0.25, 0.00,-0.25,
-                                                     0.00, 0.00, 0.00,
-                                                    -0.25, 0.00, 0.25);
+  img_pyr.at(pyr_level).convertTo(img_32f, CV_32FC1, 1.0f / 255.0);
+  cv::Mat kernel_deriv_x = (cv::Mat_<float>(1, 3) << -0.5, 0.0, 0.5);
+  cv::Mat kernel_deriv_xx = (cv::Mat_<float>(1, 3) << 1.0, -2.0, 1.0);
+  cv::Mat kernel_deriv_xy =
+      (cv::Mat_<float>(3, 3) << 0.25, 0.00, -0.25, 0.00, 0.00, 0.00, -0.25, 0.00, 0.25);
   // Apply filter
   cv::Mat Lt = img_32f;
-  cv::Point anchor = cv::Point(-1,-1);
+  cv::Point anchor = cv::Point(-1, -1);
   cv::Mat Lx, Ly;
   cv::Mat Lxx, Lxy, Lyy;
   cv::Mat edges;
-  for(int iter = 0; iter < num_iter; ++iter)
-  {
+  for (int iter = 0; iter < num_iter; ++iter) {
     // Compute image derivatives
     cv::filter2D(Lt, Lx, CV_32FC1, kernel_deriv_x, anchor, 0, cv::BORDER_REPLICATE);
     cv::filter2D(Lt, Ly, CV_32FC1, kernel_deriv_x.t(), anchor, 0, cv::BORDER_REPLICATE);
@@ -90,16 +86,13 @@ void detectNonlinearDiffusionEdges(const ImgPyr& img_pyr)
     // Edge detection.
     cv::Mat Lt_u8;
     Lt.convertTo(Lt_u8, CV_8UC1, 255);
-    cv::Canny(Lt_u8 , edges, canny_low_threshold, canny_low_threshold*canny_ratio);
+    cv::Canny(Lt_u8, edges, canny_low_threshold, canny_low_threshold * canny_ratio);
 
     std::cout << "iter = " << iter << std::endl;
     cv::imshow("Lt", Lt);
     cv::imshow("Edges", edges);
     cv::waitKey(0);
   }
-
-
-
 }
 
 /*
@@ -129,8 +122,7 @@ void detectGuillermoEdges(const ImgPyr& img_pyr)
 }
 */
 
-void edgeletDetection(const ImgPyr& img_pyr)
-{
+void edgeletDetection(const ImgPyr& img_pyr) {
   const int border = 10;
   const int level = 1;
   const float thresh = 200.0f;
@@ -139,26 +131,24 @@ void edgeletDetection(const ImgPyr& img_pyr)
 
   // compute image first derivative
   cv::Mat img, dx, dy;
-  cv::GaussianBlur(img_pyr[level], img, cv::Size(3,3), 0);
+  cv::GaussianBlur(img_pyr[level], img, cv::Size(3, 3), 0);
   cv::Scharr(img, dx, CV_16S, 1, 0, 1, 0, cv::BORDER_DEFAULT);
   cv::Scharr(img, dy, CV_16S, 0, 1, 1, 0, cv::BORDER_DEFAULT);
 
   // compute angle and magnitude in angle direction
-  const int max_row = dx.rows-border;
-  const int max_col = dx.cols-border;
-  for(int y = border; y < max_row; ++y)
-  {
+  const int max_row = dx.rows - border;
+  const int max_col = dx.cols - border;
+  for (int y = border; y < max_row; ++y) {
     int16_t* p_dx = dx.ptr<int16_t>(y);
     int16_t* p_dy = dy.ptr<int16_t>(y);
-    for(int x = border; x < max_col; ++x)
-    {
-      angle.at<uint8_t>(y,x) = ((std::atan2(p_dy[x], p_dx[x]) + M_PI) / (2.0f * M_PI)) * 10;
-      const float mag = std::sqrt(p_dx[x]*p_dx[x]+p_dy[x]*p_dy[x]);
-      score.at<float>(y,x) = (mag > thresh) ? mag : 0.0f ;
+    for (int x = border; x < max_col; ++x) {
+      angle.at<uint8_t>(y, x) = ((std::atan2(p_dy[x], p_dx[x]) + M_PI) / (2.0f * M_PI)) * 10;
+      const float mag = std::sqrt(p_dx[x] * p_dx[x] + p_dy[x] * p_dy[x]);
+      score.at<float>(y, x) = (mag > thresh) ? mag : 0.0f;
     }
   }
 
-    const int stride=score.step;
+  const int stride = score.step;
 
   /*
   // 8-neighbor nonmax suppression
@@ -194,30 +184,27 @@ void edgeletDetection(const ImgPyr& img_pyr)
 
   // 8-neighbor nonmax suppression
   cv::Mat score_nonmax(score.size(), CV_8UC1, cv::Scalar(0));
-  for(int y=2; y<score.rows-2; ++y)
-  {
-    const float* p = &score.at<float>(y,2);
-    //const uint8_t* a = &ang_best.at<uint8_t>(y,2);
-    for(int x=2; x<score.cols-2; ++x, ++p)//, ++a)
+  for (int y = 2; y < score.rows - 2; ++y) {
+    const float* p = &score.at<float>(y, 2);
+    // const uint8_t* a = &ang_best.at<uint8_t>(y,2);
+    for (int x = 2; x < score.cols - 2; ++x, ++p)  //, ++a)
     {
-      //if(*a == 0) continue;
-      const float* const center=p;
-      if(*center<thresh) continue;
-      if(*(center+1)>=*center) continue;
-      if(*(center-1)>*center) continue;
-      const float* const p1=(center+stride);
-      const float* const p2=(center-stride);
-      if(*p1>=*center) continue;
-      if(*p2>*center) continue;
-      if(*(p1+1)>=*center) continue;
-      if(*(p1-1)>*center) continue;
-      if(*(p2+1)>=*center) continue;
-      if(*(p2-1)>*center) continue;
-      score_nonmax.at<uint8_t>(y,x) = 255;
+      // if(*a == 0) continue;
+      const float* const center = p;
+      if (*center < thresh) continue;
+      if (*(center + 1) >= *center) continue;
+      if (*(center - 1) > *center) continue;
+      const float* const p1 = (center + stride);
+      const float* const p2 = (center - stride);
+      if (*p1 >= *center) continue;
+      if (*p2 > *center) continue;
+      if (*(p1 + 1) >= *center) continue;
+      if (*(p1 - 1) > *center) continue;
+      if (*(p2 + 1) >= *center) continue;
+      if (*(p2 - 1) > *center) continue;
+      score_nonmax.at<uint8_t>(y, x) = 255;
     }
   }
-
-
 
   double minval, maxval;
   cv::minMaxLoc(score, &minval, &maxval);
@@ -228,10 +215,10 @@ void edgeletDetection(const ImgPyr& img_pyr)
   cv::waitKey(0);
 }
 
-void test()
-{
+void test() {
   // Load dataset.
-  std::string dataset_dir = ros::package::getPath("rpg_datasets")+"/rpg_urban_pinhole";
+  std::string dataset_dir =
+      ament_index_cpp::get_package_share_directory("rpg_datasets") + "/rpg_urban_pinhole";
   svo::test_utils::SyntheticDataset dataset(dataset_dir, 0, 0);
 
   // Load detector.
@@ -256,53 +243,52 @@ void test()
   detectNonlinearDiffusionEdges(frame->img_pyr_);
 
   // Elder Zucker
-  if(false)
-  {
+  if (false) {
     edgeletDetection(frame->img_pyr_);
 
-    double sigma = 0.2*255;
+    double sigma = 0.2 * 255;
     cv::Mat edge_map, level_map;
     elder_zucker::detectEdges(frame->img_pyr_, sigma, edge_map, level_map);
 
     double minval, maxval;
     cv::minMaxLoc(edge_map, &minval, &maxval);
     cv::Mat edge_map_normalized = (edge_map - minval) / (maxval - minval);
-    cv::Mat level_map_normalized = level_map*40;
+    cv::Mat level_map_normalized = level_map * 40;
 
     cv::imshow("edge_map", edge_map_normalized);
     cv::imshow("level_map", level_map_normalized);
 
     constexpr int kHalfPatchSize = 4;
     constexpr int kPatchSize = 2 * kHalfPatchSize;
-    uint8_t patch[kPatchSize*kPatchSize] __attribute__ ((aligned (16)));
-    for(size_t i = 0; i < frame->numFeatures(); ++i)
-    {
+    uint8_t patch[kPatchSize * kPatchSize] __attribute__((aligned(16)));
+    for (size_t i = 0; i < frame->numFeatures(); ++i) {
       size_t level = frame->level_vec_[i];
 
       // create patch
-      warp::createPatchNoWarp(
-            frame->img_pyr_[level], (frame->px_vec_.col(i)/ (1 << level)).cast<int>(),
-            kHalfPatchSize, patch);
+      warp::createPatchNoWarp(frame->img_pyr_[level],
+                              (frame->px_vec_.col(i) / (1 << level)).cast<int>(), kHalfPatchSize,
+                              patch);
       cv::Mat patch_upsampled;
       cv::Mat patch_img(kPatchSize, kPatchSize, CV_8UC1, patch);
       patch_utils::normalizeAndUpsamplePatch(patch_img, kPatchSize, &patch_upsampled);
 
       // compute angle using histogram (GREEN
       double angle_hist = feature_detection_utils::getAngleAtPixelUsingHistogram(
-            frame->img_pyr_[level], (frame->px_vec_.col(i)/(1<<level)).cast<int>(), kHalfPatchSize);
-      cv::line(patch_upsampled,
-               cv::Point2f(patch_upsampled.rows/2, patch_upsampled.rows/2),
-               cv::Point2f(patch_upsampled.rows/2+15*std::cos(angle_hist), patch_upsampled.rows/2 +15*std::sin(angle_hist)),
-               cv::Scalar(0,255,0), 3);
+          frame->img_pyr_[level], (frame->px_vec_.col(i) / (1 << level)).cast<int>(),
+          kHalfPatchSize);
+      cv::line(patch_upsampled, cv::Point2f(patch_upsampled.rows / 2, patch_upsampled.rows / 2),
+               cv::Point2f(patch_upsampled.rows / 2 + 15 * std::cos(angle_hist),
+                           patch_upsampled.rows / 2 + 15 * std::sin(angle_hist)),
+               cv::Scalar(0, 255, 0), 3);
 
       // compute angle using gradient (RED)
       double angle_grad;
-      feature_detection_utils::getCornerAngle
-          (frame->img_pyr_, frame->px_vec_.col(i), level, &angle_grad);
-      cv::line(patch_upsampled,
-               cv::Point2f(patch_upsampled.rows/2, patch_upsampled.rows/2),
-               cv::Point2f(patch_upsampled.rows/2+15*std::cos(angle_grad), patch_upsampled.rows/2 +15*std::sin(angle_grad)),
-               cv::Scalar(0,0,255), 3);
+      feature_detection_utils::getCornerAngle(frame->img_pyr_, frame->px_vec_.col(i), level,
+                                              &angle_grad);
+      cv::line(patch_upsampled, cv::Point2f(patch_upsampled.rows / 2, patch_upsampled.rows / 2),
+               cv::Point2f(patch_upsampled.rows / 2 + 15 * std::cos(angle_grad),
+                           patch_upsampled.rows / 2 + 15 * std::sin(angle_grad)),
+               cv::Scalar(0, 0, 255), 3);
 
       cv::imshow("patch", patch_upsampled);
       cv::waitKey(0);
@@ -315,13 +301,9 @@ void test()
   }
 }
 
-} // namespace svo
+}  // namespace
 
-int main(int argc, char **argv)
-{
-  google::InitGoogleLogging(argv[0]);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-
+int main(int argc, char** argv) {
   test();
 
   return 0;

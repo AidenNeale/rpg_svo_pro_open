@@ -2,47 +2,39 @@
 // Unauthorized copying of this file, via any medium is strictly prohibited
 // Proprietary and confidential
 
-#include <gtest/gtest.h>
-
 #include <aslam/common/entrypoint.h>
-#include <svo/vio_common/test_utils.hpp>
+#include <gtest/gtest.h>
 #include <svo/common/transformation.h>
 
-#include "svo/ceres_backend/map.hpp"
-#include "svo/ceres_backend/relative_pose_error.hpp"
-#include "svo/ceres_backend/pose_parameter_block.hpp"
+#include <svo/vio_common/test_utils.hpp>
 
-TEST(okvisTestSuite, RelativePoseError)
-{
+#include "svo/ceres_backend/map.hpp"
+#include "svo/ceres_backend/pose_parameter_block.hpp"
+#include "svo/ceres_backend/relative_pose_error.hpp"
+
+TEST(okvisTestSuite, RelativePoseError) {
   constexpr bool deterministic = true;
   constexpr size_t n_poses = 10;
   constexpr double jacobian_rel_tol = 1e-6;
 
   svo::ceres_backend::Map map;
   size_t id = 0;
-  for (size_t i = 0; i < n_poses; ++i)
-  {
+  for (size_t i = 0; i < n_poses; ++i) {
     svo::Transformation T1, T2;
-    T1.setRandom(
-          svo::test_utils::sampleUniformRealDistribution<double>(deterministic),
-          svo::test_utils::sampleUniformRealDistribution<double>(
-            deterministic, 0.0, M_PI));
-    T2.setRandom(
-          svo::test_utils::sampleUniformRealDistribution<double>(deterministic),
-          svo::test_utils::sampleUniformRealDistribution<double>(
-            deterministic, 0.0, M_PI));
+    T1.setRandom(svo::test_utils::sampleUniformRealDistribution<double>(deterministic),
+                 svo::test_utils::sampleUniformRealDistribution<double>(deterministic, 0.0, M_PI));
+    T2.setRandom(svo::test_utils::sampleUniformRealDistribution<double>(deterministic),
+                 svo::test_utils::sampleUniformRealDistribution<double>(deterministic, 0.0, M_PI));
 
     // create and add parameter blocks first constant, second variable
     std::shared_ptr<svo::ceres_backend::PoseParameterBlock> pose_parameter_block1 =
         std::make_shared<svo::ceres_backend::PoseParameterBlock>(T1, ++id);
-    map.addParameterBlock(pose_parameter_block1,
-                          svo::ceres_backend::Map::Pose6d);
+    map.addParameterBlock(pose_parameter_block1, svo::ceres_backend::Map::Pose6d);
     map.setParameterBlockConstant(id);
 
     std::shared_ptr<svo::ceres_backend::PoseParameterBlock> pose_parameter_block2 =
         std::make_shared<svo::ceres_backend::PoseParameterBlock>(T2, ++id);
-    map.addParameterBlock(pose_parameter_block2,
-                          svo::ceres_backend::Map::Pose6d);
+    map.addParameterBlock(pose_parameter_block2, svo::ceres_backend::Map::Pose6d);
     map.setParameterBlockVariable(id);
 
     // add a relative pose error
@@ -50,7 +42,7 @@ TEST(okvisTestSuite, RelativePoseError)
         std::make_shared<svo::ceres_backend::RelativePoseError>(1.0, 1.0);
     // add it
     ceres::ResidualBlockId res_id = map.addResidualBlock(
-          relative_pose_error, nullptr, pose_parameter_block1, pose_parameter_block2);
+        relative_pose_error, nullptr, pose_parameter_block1, pose_parameter_block2);
     // check Jacobian
     EXPECT_TRUE(map.isMinimalJacobianCorrect(res_id, jacobian_rel_tol))
         << "Jacobian verification on homogeneous point error failed.";

@@ -10,50 +10,38 @@
 
 #pragma once
 
-#include <svo/common/types.h>
 #include <svo/common/transformation.h>
+#include <svo/common/types.h>
 
-#include <vector>
+#include <iostream>
 #include <string>
+#include <vector>
 
 // DBoW2 (courtesy: Dorian Galvez)
 #include <DBoW2/DBoW2.h>
 
 // OpenCV
 #include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/features2d/features2d.hpp>
 #include <opencv2/core/eigen.hpp>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
-// logging
-#include <glog/logging.h>
-
-namespace svo
-{
-using BearingVecs =
-    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>;
-class KeyFrame
-{
-public:
+namespace svo {
+using BearingVecs = std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>;
+class KeyFrame {
+ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   /*default constructor*/
-  KeyFrame(int Nframeid)
-  {
-    NframeID_ = Nframeid;
-  }
+  KeyFrame(int Nframeid) { NframeID_ = Nframeid; }
 
   /* Destructor */
-  ~KeyFrame()
-  {
-  }
+  ~KeyFrame() {}
 
   /* Transform the landmarks given a Transformation */
-  inline void transformMap(const Transformation& T)
-  {
-    LOG(FATAL) << "This should not be called with points"
-                  " represented now in the camera frame.";
-    for (size_t i = 0; i < svo_landmarksvector_cam_.size(); i++)
-    {
+  inline void transformMap(const Transformation& T) {
+    std::cerr << "This should not be called with points"
+                 " represented now in the camera frame.";
+    for (size_t i = 0; i < svo_landmarksvector_cam_.size(); i++) {
       Eigen::Vector3d pos =
           Eigen::Vector3d(svo_landmarksvector_cam_[i].x, svo_landmarksvector_cam_[i].y,
                           svo_landmarksvector_cam_[i].z);
@@ -62,18 +50,15 @@ public:
     }
   }
 
-  inline void getTwcCvMat(cv::Mat* Twc_cvmat)
-  {
+  inline void getTwcCvMat(cv::Mat* Twc_cvmat) {
     Eigen::Matrix<double, 4, 4> Twc_mat = T_w_c_.getTransformationMatrix();
-    (*Twc_cvmat) = (cv::Mat_<double>(4, 4) << Twc_mat(0, 0), Twc_mat(0, 1),
-                    Twc_mat(0, 2), Twc_mat(0, 3), Twc_mat(1, 0), Twc_mat(1, 1),
-                    Twc_mat(1, 2), Twc_mat(1, 3), Twc_mat(2, 0), Twc_mat(2, 1),
-                    Twc_mat(2, 2), Twc_mat(2, 3), Twc_mat(3, 0), Twc_mat(3, 1),
-                    Twc_mat(3, 2), Twc_mat(3, 3));
+    (*Twc_cvmat) =
+        (cv::Mat_<double>(4, 4) << Twc_mat(0, 0), Twc_mat(0, 1), Twc_mat(0, 2), Twc_mat(0, 3),
+         Twc_mat(1, 0), Twc_mat(1, 1), Twc_mat(1, 2), Twc_mat(1, 3), Twc_mat(2, 0), Twc_mat(2, 1),
+         Twc_mat(2, 2), Twc_mat(2, 3), Twc_mat(3, 0), Twc_mat(3, 1), Twc_mat(3, 2), Twc_mat(3, 3));
   }
 
-  inline void clearSVOFeatureInfo()
-  {
+  inline void clearSVOFeatureInfo() {
     svo_keypointsvector_.clear();
     svo_bearingvectors_.clear();
     svo_landmarksvector_cam_.clear();
@@ -88,11 +73,9 @@ public:
     svo_node_ids_.clear();
   }
 
-  inline void getLandmarksInWorld(std::vector<cv::Point3f>* pw_vec)
-  {
+  inline void getLandmarksInWorld(std::vector<cv::Point3f>* pw_vec) {
     pw_vec->clear();
-    for (const cv::Point3f& pc : svo_landmarksvector_cam_)
-    {
+    for (const cv::Point3f& pc : svo_landmarksvector_cam_) {
       Eigen::Vector3d pw = T_w_c_.transform(Eigen::Vector3d(pc.x, pc.y, pc.z));
       pw_vec->emplace_back(cv::Point3f(pw.x(), pw.y(), pw.z()));
     }
@@ -140,4 +123,4 @@ public:
   bool skip_frame_ = false;
 };
 using KeyFramePtr = std::shared_ptr<KeyFrame>;
-}
+}  // namespace svo

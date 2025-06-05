@@ -5,7 +5,7 @@
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright notice,
  *     this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright notice,
@@ -40,22 +40,19 @@
 
 #include "svo/ceres_backend/pose_parameter_block.hpp"
 
+#include <iostream>
+
 namespace svo {
 namespace ceres_backend {
 
 // Default constructor (assumes not fixed).
-PoseParameterBlock::PoseParameterBlock()
-    : ParameterBlock::ParameterBlock()
-{
-  setFixed(false);
-}
+PoseParameterBlock::PoseParameterBlock() : ParameterBlock::ParameterBlock() { setFixed(false); }
 
 // Trivial destructor.
 PoseParameterBlock::~PoseParameterBlock() {}
 
 // Constructor with estimate.
-PoseParameterBlock::PoseParameterBlock(const Transformation& T_WS, uint64_t id)
-{
+PoseParameterBlock::PoseParameterBlock(const Transformation& T_WS, uint64_t id) {
   setEstimate(T_WS);
   setId(id);
   setFixed(false);
@@ -63,8 +60,7 @@ PoseParameterBlock::PoseParameterBlock(const Transformation& T_WS, uint64_t id)
 
 // setters
 // Set estimate of this parameter block.
-void PoseParameterBlock::setEstimate(const Transformation& T_WS)
-{
+void PoseParameterBlock::setEstimate(const Transformation& T_WS) {
   const Eigen::Vector3d& r = T_WS.getPosition();
   const Quaternion& q = T_WS.getRotation();
   parameters_[0] = r[0];
@@ -78,12 +74,15 @@ void PoseParameterBlock::setEstimate(const Transformation& T_WS)
 
 // getters
 // Get estimate.
-Transformation PoseParameterBlock::estimate() const
-{
+Transformation PoseParameterBlock::estimate() const {
+  std::cout << "Estimate quaternion: w=" << parameters_[6] << " x=" << parameters_[3]
+            << " y=" << parameters_[4] << " z=" << parameters_[5] << " norm="
+            << std::sqrt(parameters_[3] * parameters_[3] + parameters_[4] * parameters_[4] +
+                         parameters_[5] * parameters_[5] + parameters_[6] * parameters_[6])
+            << std::endl;
   return Transformation(
       Eigen::Vector3d(parameters_[0], parameters_[1], parameters_[2]),
-      Eigen::Quaterniond(parameters_[6], parameters_[3], parameters_[4],
-                         parameters_[5]));
+      Eigen::Quaterniond(parameters_[6], parameters_[3], parameters_[4], parameters_[5]));
 }
 
 }  // namespace ceres_backend

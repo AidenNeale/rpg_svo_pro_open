@@ -1,29 +1,24 @@
 #pragma once
 
+#include <Eigen/Core>
 #include <cmath>
 #include <iostream>
-#include <Eigen/Core>
-#include <glog/logging.h>
 
-namespace vk
-{
-namespace cameras
-{
+namespace vk {
+namespace cameras {
 // This class implements the distortion model described in the paper:
 // "A Generic Camera Model and Calibration Method for Conventional, Wide-Angle,
 // and Fish-Eye Lenses" by Juho Kannala and Sami S. Brandt, PAMI.
-class EquidistantDistortion
-{
-public:
-  EquidistantDistortion(const double k1, const double k2, const double k3,
-                        const double k4)
-    : k1_(k1), k2_(k2), k3_(k3), k4_(k4)
-  {
-  }
+class EquidistantDistortion {
+ public:
+  EquidistantDistortion(const double k1, const double k2, const double k3, const double k4)
+      : k1_(k1), k2_(k2), k3_(k3), k4_(k4) {}
 
-  EquidistantDistortion(const Eigen::VectorXd& parameters)
-  {
-    CHECK(parameters.size() == 4);
+  EquidistantDistortion(const Eigen::VectorXd& parameters) {
+    if (parameters.size() != 4) {
+      throw std::runtime_error("EquidistantDistortion: expected 4 parameters, got " +
+                               std::to_string(parameters.size()));
+    }
     k1_ = parameters(0);
     k2_ = parameters(1);
     k3_ = parameters(2);
@@ -32,11 +27,9 @@ public:
 
   ~EquidistantDistortion() = default;
 
-  inline void distort(double& x, double& y) const
-  {
+  inline void distort(double& x, double& y) const {
     const double r = std::sqrt(x * x + y * y);
-    if (r < kRThresh)
-    {
+    if (r < kRThresh) {
       return;
     }
 
@@ -47,11 +40,9 @@ public:
     y *= scaling;
   }
 
-  inline Eigen::Vector2d distort(const Eigen::Vector2d& vector) const
-  {
+  inline Eigen::Vector2d distort(const Eigen::Vector2d& vector) const {
     const double r = vector.norm();
-    if (r < kRThresh)
-    {
+    if (r < kRThresh) {
       return vector;
     }
 
@@ -61,11 +52,9 @@ public:
     return vector * scaling;
   }
 
-  inline Eigen::Matrix2d jacobian(const Eigen::Vector2d& uv) const
-  {
+  inline Eigen::Matrix2d jacobian(const Eigen::Vector2d& uv) const {
     const double r = uv.norm();
-    if (r < kRThresh)
-    {
+    if (r < kRThresh) {
       return Eigen::Matrix2d::Identity();
     }
 
@@ -94,32 +83,27 @@ public:
     return jac;
   }
 
-  inline void undistort(double& x, double& y) const
-  {
+  inline void undistort(double& x, double& y) const {
     const double thetad = std::sqrt(x * x + y * y);
     double theta = thetad;
-    for (int i = 0; i < 5; ++i)
-    {
+    for (int i = 0; i < 5; ++i) {
       const double theta2 = theta * theta;
       const double theta4 = theta2 * theta2;
       const double theta6 = theta4 * theta2;
       const double theta8 = theta4 * theta4;
-      theta = thetad /
-              (1.0 + k1_ * theta2 + k2_ * theta4 + k3_ * theta6 + k4_ * theta8);
+      theta = thetad / (1.0 + k1_ * theta2 + k2_ * theta4 + k3_ * theta6 + k4_ * theta8);
     }
     const double scaling = std::tan(theta) / thetad;
     x *= scaling;
     y *= scaling;
   }
 
-  inline void print(std::ostream& out) const
-  {
-    out << "  Distortion: Equidistant(" << k1_ << ", " << k2_ << ", " << k3_
-        << ", " << k4_ << ")" << std::endl;
+  inline void print(std::ostream& out) const {
+    out << "  Distortion: Equidistant(" << k1_ << ", " << k2_ << ", " << k3_ << ", " << k4_ << ")"
+        << std::endl;
   }
 
-  enum DistortionParameters
-  {
+  enum DistortionParameters {
     kRadialDistortionFactor1,
     kRadialDistortionFactor2,
     kRadialDistortionFactor3,
@@ -127,8 +111,7 @@ public:
   };
   // returns distortion parameters as vector
   // [k1 k2 k3 k4]
-  inline Eigen::VectorXd getDistortionParameters() const
-  {
+  inline Eigen::VectorXd getDistortionParameters() const {
     Eigen::VectorXd distortion(4);
     distortion(0) = k1_;
     distortion(1) = k2_;
@@ -142,26 +125,22 @@ public:
   double k3_ = 0;  // Radial distortion factor 3
   double k4_ = 0;  // Radial distortion factor 4
 
-private:
-  inline double thetad_from_theta(const double theta) const
-  {
+ private:
+  inline double thetad_from_theta(const double theta) const {
     const double theta2 = theta * theta;
     const double theta4 = theta2 * theta2;
     const double theta6 = theta4 * theta2;
     const double theta8 = theta4 * theta4;
-    const double thetad = theta * (1.0 + k1_ * theta2 + k2_ * theta4 +
-                                   k3_ * theta6 + k4_ * theta8);
+    const double thetad = theta * (1.0 + k1_ * theta2 + k2_ * theta4 + k3_ * theta6 + k4_ * theta8);
     return thetad;
   }
 
-  inline double deriv_thetad_from_theta(const double theta) const
-  {
+  inline double deriv_thetad_from_theta(const double theta) const {
     const double theta2 = theta * theta;
     const double theta4 = theta2 * theta2;
     const double theta6 = theta4 * theta2;
     const double theta8 = theta4 * theta4;
-    return 1 + 3 * k1_ * theta2 + 5 * k2_ * theta4 + 7 * k3_ * theta6 +
-           9 * k4_ * theta8;
+    return 1 + 3 * k1_ * theta2 + 5 * k2_ * theta4 + 7 * k3_ * theta6 + 9 * k4_ * theta8;
   }
 
   const double kRThresh = 1e-8;

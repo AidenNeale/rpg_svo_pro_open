@@ -1,17 +1,13 @@
 #include <gtest/gtest.h>
-
-#include <functional>
-#include <type_traits>
-
-#include <random>
-
-#include <eigen-checks/gtest.h>
 #include <svo/common/feature_wrapper.h>
 
-template<class T>
+#include <functional>
+#include <random>
+#include <type_traits>
+
+template <class T>
 typename std::enable_if<std::is_integral<T>::value, std::function<T()> >::type
-getRandomGenerator()
-{
+getRandomGenerator() {
   std::default_random_engine generator;
   std::uniform_int_distribution<T> distribution(std::numeric_limits<T>::lowest(),
                                                 std::numeric_limits<T>::max());
@@ -19,10 +15,9 @@ getRandomGenerator()
   return random_val;
 }
 
-template<class T>
+template <class T>
 typename std::enable_if<!std::is_integral<T>::value, std::function<T()> >::type
-getRandomGenerator()
-{
+getRandomGenerator() {
   std::default_random_engine generator;
   std::uniform_real_distribution<T> distribution(std::numeric_limits<T>::lowest(),
                                                  std::numeric_limits<T>::max());

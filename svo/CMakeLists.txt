@@ -1,10 +1,32 @@
+cmake_minimum_required(VERSION 3.8)
 project(svo)
-cmake_minimum_required(VERSION 2.8.3)
 
-find_package(catkin_simple)
-catkin_simple()
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_BUILD_TYPE Release)
 
-include(SvoSetup)
+ADD_DEFINITIONS(-DSVO_LOOP_CLOSING)
+
+
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_gtest REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(OpenCV REQUIRED)
+
+find_package(rpg_common REQUIRED)
+find_package(svo_common REQUIRED)
+find_package(svo_direct REQUIRED)
+find_package(svo_img_align REQUIRED)
+find_package(svo_online_loopclosing)
+find_package(svo_pgo REQUIRED)
+find_package(svo_test_utils REQUIRED)
+find_package(svo_tracker REQUIRED)
+find_package(svo_vio_common REQUIRED)
+find_package(vikit_cameras REQUIRED)
+find_package(vikit_common REQUIRED)
+find_package(vikit_ros REQUIRED)
+find_package(vikit_solver REQUIRED)
+
 
 list(APPEND SVO_SOURCEFILES
   src/frame_handler_mono.cpp
@@ -35,22 +57,68 @@ list(APPEND SVO_HEADERFILES
   include/svo/stereo_triangulation.h
   include/svo/io.h
   include/svo/svo.h
-  )
+)
 
 ################################################################################
 # Create svo library
-include_directories(include ${INCLUDE_DIRS})
-cs_add_library(svo SHARED ${SVO_SOURCEFILES} ${SVO_HEADERFILES})
-target_link_libraries(svo ${LINK_LIBS})
+add_library(${PROJECT_NAME} SHARED ${SVO_SOURCEFILES})
+target_include_directories(${PROJECT_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(${PROJECT_NAME}
+  rclcpp
+  rpg_common
+  svo_common
+  svo_direct
+  svo_img_align
+  svo_online_loopclosing
+  svo_pgo
+  svo_test_utils
+  svo_tracker
+  svo_vio_common
+  vikit_cameras
+  vikit_common
+  vikit_ros
+  vikit_solver
+)
+target_link_libraries(svo ${OpenCV_LIBRARIES} Eigen3::Eigen)
 
 ################################################################################
 ###
 ### GTEST
 ###
 
-catkin_add_gtest(${PROJECT_NAME}-test-frame test/test_frame.cpp)
+ament_add_gtest(${PROJECT_NAME}-test-frame test/test_frame.cpp)
 target_link_libraries(${PROJECT_NAME}-test-frame ${PROJECT_NAME})
 
 ################################################################################
-cs_install()
-cs_export()
+# Install library and headers
+install(TARGETS ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+ament_export_dependencies(
+  rclcpp
+  rpg_common
+  svo_common
+  svo_direct
+  svo_img_align
+  svo_test_utils
+  svo_tracker
+  svo_vio_common
+  vikit_cameras
+  vikit_common
+  vikit_ros
+  vikit_solver
+)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_include_directories(include)
+ament_package()
+

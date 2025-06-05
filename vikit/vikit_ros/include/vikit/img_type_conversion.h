@@ -1,14 +1,12 @@
 #pragma once
 
-#include <ros/ros.h>
-#include <sensor_msgs/image_encodings.h>
-#include <cv_bridge/cv_bridge.h>
+#include <cv_bridge/cv_bridge.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 
 namespace vk {
-namespace img_type_conversion
-{
+namespace img_type_conversion {
 int sensorMsgsEncodingToOpenCVType(const std::string& encoding);
 
 std::string openCVTypeToSensorMsgsEncoding(const int opencv_type);
-} // namespace img_type_conversion
-} // namespace vk
+}  // namespace img_type_conversion
+}  // namespace vk

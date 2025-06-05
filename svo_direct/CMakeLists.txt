@@ -1,11 +1,22 @@
+cmake_minimum_required(VERSION 3.8)
 project(svo_direct)
-cmake_minimum_required(VERSION 2.8.3)
 
-find_package(catkin_simple REQUIRED)
-catkin_simple(ALL_DEPS_REQUIRED)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_BUILD_TYPE Release)
+
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_gtest REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(fast REQUIRED)
+find_package(glog REQUIRED)
 
-include(SvoSetup)
+find_package(svo_common REQUIRED)
+find_package(vikit_common REQUIRED)
+find_package(vikit_cameras REQUIRED)
+find_package(vikit_solver REQUIRED)
+find_package(svo_test_utils REQUIRED)
 
 set(HEADERS
   include/svo/direct/patch_warp.h
@@ -30,36 +41,75 @@ set(SOURCES
   src/depth_filter.cpp
   src/depth_estimation.cpp
   src/elder_zucker.cpp
-  )
+)
 
-cs_add_library(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES})
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+target_include_directories(${PROJECT_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(${PROJECT_NAME}
+  svo_common
+  svo_test_utils
+  vikit_common
+  vikit_solver
+  fast
+)
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES} Eigen3::Eigen glog::glog)
 
-cs_add_executable(svo_test_patch_score test/test_patch_score.cpp)
+################################################################################
+###
+### Executables
+###
+add_executable(svo_test_patch_score test/test_patch_score.cpp)
 target_link_libraries(svo_test_patch_score ${PROJECT_NAME})
+ament_target_dependencies(svo_test_patch_score
+  ament_index_cpp
+)
 
-cs_add_executable(svo_test_edgelet_direction test/test_edgelet_direction.cpp)
-target_link_libraries(svo_test_edgelet_direction ${PROJECT_NAME})
+add_executable(svo_test_edgelet_direction test/test_edgelet_direction.cpp)
+target_link_libraries(svo_test_edgelet_direction
+  ${PROJECT_NAME}
+)
+ament_target_dependencies(svo_test_edgelet_direction
+  ament_index_cpp
+)
 
-cs_add_executable(svo_test_edgelet_extraction test/test_edgelet_extraction.cpp)
+add_executable(svo_test_edgelet_extraction test/test_edgelet_extraction.cpp)
 target_link_libraries(svo_test_edgelet_extraction ${PROJECT_NAME})
+ament_target_dependencies(svo_test_edgelet_extraction
+  ament_index_cpp
+)
 
-cs_add_executable(svo_test_feature_alignment test/test_feature_alignment.cpp)
+add_executable(svo_test_feature_alignment test/test_feature_alignment.cpp)
 target_link_libraries(svo_test_feature_alignment ${PROJECT_NAME})
-
+ament_target_dependencies(svo_test_feature_alignment
+  ament_index_cpp
+)
 ################################################################################
 ###
 ### GTEST
 ###
-
-catkin_add_gtest(${PROJECT_NAME}-test-depth-estimation
+ament_add_gtest(${PROJECT_NAME}_test_depth_estimation
   test/test_depth_estimation.cpp
   test/test_utils.h
 )
-target_link_libraries(${PROJECT_NAME}-test-depth-estimation ${PROJECT_NAME} pthread)
-
+target_link_libraries(${PROJECT_NAME}_test_depth_estimation ${PROJECT_NAME})
+ament_target_dependencies(${PROJECT_NAME}_test_depth_estimation
+  ament_index_cpp
+)
 
 ################################################################################
-cs_install()
-cs_export()
+install(TARGETS ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+install(DIRECTORY include/
+  DESTINATION include/
+)
 
+ament_export_libraries(${PROJECT_NAME})
+ament_export_include_directories(include)
+ament_package()

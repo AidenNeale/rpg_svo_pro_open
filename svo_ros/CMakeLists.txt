@@ -1,21 +1,47 @@
+cmake_minimum_required(VERSION 3.8)
 project(svo_ros)
-cmake_minimum_required(VERSION 2.8.3)
 
-find_package(catkin_simple REQUIRED)
-find_package(rostest REQUIRED)
-catkin_simple()
+ADD_DEFINITIONS(-DSVO_LOOP_CLOSING)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_BUILD_TYPE Release)
+
+find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(PCL COMPONENTS common REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(Ceres REQUIRED)
 
-set(USE_GTSAM false)
-include(SvoSetup)
-if(USE_GLOBAL_MAP OR USE_GTSAM)
-  find_package(GTSAMCMakeTools REQUIRED)
-  find_package(GTSAM REQUIRED)
-  set(GTSAM_LIBRARIES "gtsam")
-endif()
-message(STATUS "GTSAM include dir: ${GTSAM_INCLUDE_DIR}")
-message(STATUS "GTSAM library: ${GTSAM_LIBRARIES}")
-include_directories(${GTSAM_INCLUDE_DIR})
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+
+find_package(rpg_common REQUIRED)
+find_package(svo REQUIRED)
+find_package(svo_ceres_backend REQUIRED)
+find_package(svo_common REQUIRED)
+find_package(svo_msgs REQUIRED)
+find_package(svo_online_loopclosing REQUIRED)
+find_package(vikit_common REQUIRED)
+find_package(vikit_ros REQUIRED)
+
+# set(USE_GTSAM false)
+# include(SvoSetup)
+# if(USE_GLOBAL_MAP OR USE_GTSAM)
+#   find_package(GTSAMCMakeTools REQUIRED)
+#   find_package(GTSAM REQUIRED)
+#   set(GTSAM_LIBRARIES "gtsam")
+# endif()
+# message(STATUS "GTSAM include dir: ${GTSAM_INCLUDE_DIR}")
+# message(STATUS "GTSAM library: ${GTSAM_LIBRARIES}")
+# include_directories(${GTSAM_INCLUDE_DIR})
 
 
 set(HEADERS
@@ -37,30 +63,84 @@ set(SOURCES
 )
 
 # not used anymore
-if(USE_GTSAM)
-    ADD_DEFINITIONS(-DSVO_USE_GTSAM_BACKEND)
-    list(APPEND HEADERS
-      include/svo_ros/backend_visualizer.h
-      include/svo_ros/backend_factory.h)
-    list(APPEND SOURCES
-      src/backend_visualizer.cpp
-      src/backend_factory.cpp)
-endif()
+# if(USE_GTSAM)
+#     ADD_DEFINITIONS(-DSVO_USE_GTSAM_BACKEND)
+#     list(APPEND HEADERS
+#       include/svo_ros/backend_visualizer.h
+#       include/svo_ros/backend_factory.h)
+#     list(APPEND SOURCES
+#       src/backend_visualizer.cpp
+#       src/backend_factory.cpp)
+# endif()
 
-cs_add_library(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES} ${svo_backend_LIBRARIES} ${GTSAM_LIBRARIES})
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+target_include_directories(${PROJECT_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(${PROJECT_NAME}
+  ament_index_cpp
+  rclcpp
+  cv_bridge
+  image_transport
+  PCL
+  pcl_conversions
+  geometry_msgs
+  nav_msgs
+  sensor_msgs
+  visualization_msgs
+  rpg_common
+  svo
+  svo_ceres_backend
+  svo_common
+  svo_msgs
+  svo_online_loopclosing
+  vikit_common
+  vikit_ros
+)
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES} Eigen3::Eigen ceres)
 
-cs_add_executable(svo_benchmark src/benchmark_node.cpp)
+add_executable(svo_benchmark src/benchmark_node.cpp)
 target_link_libraries(svo_benchmark ${PROJECT_NAME})
 
-cs_add_executable(svo_node src/svo_node.cpp)
+add_executable(svo_node src/svo_node.cpp)
+target_include_directories(svo_node
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
 target_link_libraries(svo_node ${PROJECT_NAME})
 
-cs_add_library(svo_nodelet src/svo_nodelet.cpp)
-target_link_libraries(svo_nodelet ${PROJECT_NAME})
-
-cs_install()
-install(FILES svo_nodelet.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+add_library(svo_nodelet SHARED src/svo_nodelet.cpp)
+target_include_directories(svo_nodelet
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
-cs_export()
+target_link_libraries(svo_nodelet ${PROJECT_NAME})
+ament_target_dependencies(svo_nodelet rclcpp rclcpp_components)
+rclcpp_components_register_nodes(svo_nodelet "svo::SvoNodelet")
+
+################################################################################
+
+install(TARGETS ${PROJECT_NAME} svo_node svo_nodelet
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+install(DIRECTORY include/
+  DESTINATION include/
+)
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}/
+)
+install(
+  DIRECTORY param scripts
+  DESTINATION share/${PROJECT_NAME}/
+)
+ament_export_libraries(${PROJECT_NAME})
+ament_export_include_directories(include)
+ament_package()
+
+

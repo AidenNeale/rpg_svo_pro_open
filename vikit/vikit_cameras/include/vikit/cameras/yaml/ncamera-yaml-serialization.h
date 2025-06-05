@@ -1,6 +1,5 @@
 #pragma once
 
-#include <glog/logging.h>
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include <yaml-cpp/yaml.h>
 #pragma diagnostic pop
@@ -13,7 +12,7 @@ class NCamera;
 
 namespace YAML {
 
-template<>
+template <>
 struct convert<std::shared_ptr<vk::cameras::NCamera>> {
   /// This function will attempt to parse an ncamera from the yaml node.
   /// By default, yaml-cpp will throw an exception if the parsing fails.
@@ -23,7 +22,7 @@ struct convert<std::shared_ptr<vk::cameras::NCamera>> {
   static Node encode(const std::shared_ptr<vk::cameras::NCamera>& ncamera);
 };
 
-template<>
+template <>
 struct convert<vk::cameras::NCamera> {
   static bool decode(const Node& node, vk::cameras::NCamera& ncamera);
   static Node encode(const vk::cameras::NCamera& ncamera);

@@ -5,7 +5,7 @@
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright notice,
  *     this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright notice,
@@ -54,10 +54,8 @@ namespace ceres_backend {
 
 /// \brief Local parameterisation of a homogeneous point [x,y,z,w]^T.
 ///        We use a Euclidean-type perturbation, i.e. only affect the x-y-z-part.
-class HomogeneousPointLocalParameterization :
-    public ceres::LocalParameterization,
-    public LocalParamizationAdditionalInterfaces
-{
+class HomogeneousPointLocalParameterization : public ceres::Manifold,
+                                              public LocalParamizationAdditionalInterfaces {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -70,8 +68,7 @@ class HomogeneousPointLocalParameterization :
   /// @param[in] x Variable.
   /// @param[in] delta Perturbation.
   /// @param[out] x_plus_delta Perturbed x.
-  virtual bool Plus(const double* x, const double* delta,
-                    double* x_plus_delta) const;
+  virtual bool Plus(const double* x, const double* delta, double* x_plus_delta) const;
 
   /// \brief Computes the minimal difference between a variable x
   ///        and a perturbed variable x_plus_delta
@@ -79,20 +76,19 @@ class HomogeneousPointLocalParameterization :
   /// @param[in] x_plus_delta Perturbed variable.
   /// @param[out] delta minimal difference.
   /// \return True on success.
-  virtual bool Minus(const double* x, const double* x_plus_delta,
-                     double* delta) const;
+  virtual bool Minus(const double* x, const double* x_plus_delta, double* delta) const;
 
   /// \brief The jacobian of Plus(x, delta) w.r.t delta at delta = 0.
   /// @param[in] x Variable.
   /// @param[out] jacobian The Jacobian.
-  virtual bool ComputeJacobian(const double* x, double* jacobian) const;
+  // virtual bool ComputeJacobian(const double* x, double* jacobian) const;
 
   /// \brief Computes the Jacobian from minimal space to naively
   ///        overparameterised space as used by ceres.
   /// @param[in] x Variable.
   /// @param[out] jacobian the Jacobian (dimension minDim x dim).
   /// \return True on success.
-  virtual bool ComputeLiftJacobian(const double* x, double* jacobian) const;
+  // virtual bool ComputeLiftJacobian(const double* x, double* jacobian) const;
 
   // provide these as static for easy use elsewhere:
 
@@ -125,16 +121,13 @@ class HomogeneousPointLocalParameterization :
   static bool liftJacobian(const double* x, double* jacobian);
 
   /// \brief The parameter block dimension.
-  virtual int GlobalSize() const
-  {
-    return 4;
-  }
+  virtual int AmbientSize() const { return 4; }
 
   /// \brief The parameter block local dimension.
-  virtual int LocalSize() const
-  {
-    return 3;
-  }
+  virtual int TangentSize() const { return 3; }
+
+  virtual bool PlusJacobian(const double* x, double* jacobian) const override;
+  virtual bool MinusJacobian(const double* x, double* jacobian) const override;
 };
 
 }  // namespace ceres_backend

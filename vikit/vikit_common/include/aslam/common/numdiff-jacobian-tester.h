@@ -1,8 +1,6 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <eigen-checks/gtest.h>
-#include <glog/logging.h>
 
 namespace aslam {
 namespace common {
@@ -43,29 +41,24 @@ namespace common {
 ///  TEST_JACOBIAN_FINITE_DIFFERENCE(Functor, x0, stepsize, tolerance, my_class_);
 ///
 /// @endcode
-#define TEST_JACOBIAN_FINITE_DIFFERENCE(FUNCTOR_TYPE, X, STEP, TOLERANCE, ...) \
-    do {\
-      FUNCTOR_TYPE functor(__VA_ARGS__);                                 \
-      typename aslam::common::NumericalDiffTraits<FUNCTOR_TYPE>::type numDiff(functor, STEP); \
-      typename FUNCTOR_TYPE::JacobianType Jnumeric;                      \
-      bool success = numDiff.getJacobianNumerical(X, Jnumeric);          \
-      EXPECT_TRUE(success) << "Num. differentiation failed!";            \
-      typename FUNCTOR_TYPE::JacobianType Jsymbolic;                     \
-      success = functor.getJacobian(X, &Jsymbolic);                      \
-      EXPECT_TRUE(success) << "Getting analytical Jacobian failed!";     \
-      EXPECT_TRUE(EIGEN_MATRIX_NEAR(Jnumeric, Jsymbolic, TOLERANCE));    \
-      VLOG(3) << "Jnumeric: " << Jnumeric << "\n";                       \
-      VLOG(3) << "Jsymbolic: " << Jsymbolic << "\n";                     \
-    } while (0)
+#define TEST_JACOBIAN_FINITE_DIFFERENCE(FUNCTOR_TYPE, X, STEP, TOLERANCE, ...)              \
+  do {                                                                                      \
+    FUNCTOR_TYPE functor(__VA_ARGS__);                                                      \
+    typename aslam::common::NumericalDiffTraits<FUNCTOR_TYPE>::type numDiff(functor, STEP); \
+    typename FUNCTOR_TYPE::JacobianType Jnumeric;                                           \
+    bool success = numDiff.getJacobianNumerical(X, Jnumeric);                               \
+    EXPECT_TRUE(success) << "Num. differentiation failed!";                                 \
+    typename FUNCTOR_TYPE::JacobianType Jsymbolic;                                          \
+    success = functor.getJacobian(X, &Jsymbolic);                                           \
+    EXPECT_TRUE(success) << "Getting analytical Jacobian failed!";                          \
+    EXPECT_TRUE(EIGEN_MATRIX_NEAR(Jnumeric, Jsymbolic, TOLERANCE));                         \
+  } while (0)
 
 // Functor base for numerical differentiation.
-template<int NY, int NX, typename _Scalar = double>
+template <int NY, int NX, typename _Scalar = double>
 struct NumDiffFunctor {
   // Type definitions.
-  enum {
-    InputsAtCompileTime = NX,
-    ValuesAtCompileTime = NY
-  };
+  enum { InputsAtCompileTime = NX, ValuesAtCompileTime = NY };
 
   typedef _Scalar Scalar;
   typedef Eigen::Matrix<Scalar, InputsAtCompileTime, 1> InputType;
@@ -83,24 +76,18 @@ struct NumDiffFunctor {
     return functional(x, fvec, nullptr);
   };
 
-  bool getJacobian(const InputType& x,
-                   JacobianType* out_jacobian) const {
+  bool getJacobian(const InputType& x, JacobianType* out_jacobian) const {
     ValueType fvec;
     return functional(x, fvec, out_jacobian);
   };
 };
 
 /// Differentiation schemes for class NumericalDiff.
-enum NumericalDiffMode {
-  Forward,
-  Central,
-  CentralSecond
-};
-
+enum NumericalDiffMode { Forward, Central, CentralSecond };
 
 // The NumericalDiff class won't compile if ValuesAtCompileTime is zero.
 // This class can be chosen by template magic in this case.
-template<typename _Functor, NumericalDiffMode mode = CentralSecond>
+template <typename _Functor, NumericalDiffMode mode = CentralSecond>
 class ZeroNumericalDiff {
  public:
   typedef _Functor Functor;
@@ -115,14 +102,14 @@ class ZeroNumericalDiff {
 
   ZeroNumericalDiff(const Functor& /* f */, Scalar /* _epsfcn */) {};
   virtual ~ZeroNumericalDiff() {};
-  bool getJacobianNumerical(const InputType& /* _x */, JacobianType &/* jac */) const {
+  bool getJacobianNumerical(const InputType& /* _x */, JacobianType& /* jac */) const {
     return true;
   }
 };
 
 /// \class NumericalDiff
 /// \brief Modified numerical differentiation code from unsupported/Eigen library
-template<typename _Functor, NumericalDiffMode mode = CentralSecond>
+template <typename _Functor, NumericalDiffMode mode = CentralSecond>
 class NumericalDiff : public _Functor {
  public:
   typedef _Functor Functor;
@@ -131,20 +118,18 @@ class NumericalDiff : public _Functor {
   typedef typename Functor::ValueType ValueType;
   typedef typename Functor::JacobianType JacobianType;
 
-  NumericalDiff(const Functor& f, Scalar _epsfcn = 0.)
-      : Functor(f),
-        epsfcn(_epsfcn) {}
+  NumericalDiff(const Functor& f, Scalar _epsfcn = 0.) : Functor(f), epsfcn(_epsfcn) {}
 
   enum {
     InputsAtCompileTime = Functor::InputsAtCompileTime,
     ValuesAtCompileTime = Functor::ValuesAtCompileTime
   };
 
-  bool getJacobianNumerical(const InputType& _x, JacobianType &jac) const {
+  bool getJacobianNumerical(const InputType& _x, JacobianType& jac) const {
     static_assert(InputsAtCompileTime > 0,
                   "Numerical Differentiation does not work for zero-sized Jacobians.");
-    using std::sqrt;
     using std::abs;
+    using std::sqrt;
     /* Local variables */
     Scalar h;
     const typename InputType::Index n = _x.size();
@@ -194,24 +179,26 @@ class NumericalDiff : public _Functor {
     }
     return success;
   }
+
  private:
   Scalar epsfcn;
   NumericalDiff& operator=(const NumericalDiff&);
 };
 
-template<typename _Functor, NumericalDiffMode mode, int ValuesAtCompileTime>
+template <typename _Functor, NumericalDiffMode mode, int ValuesAtCompileTime>
 struct NumericalDiffTraitsSelector {
   typedef NumericalDiff<_Functor, mode> type;
 };
 
-template<typename _Functor, NumericalDiffMode mode>
+template <typename _Functor, NumericalDiffMode mode>
 struct NumericalDiffTraitsSelector<_Functor, mode, 0> {
   typedef ZeroNumericalDiff<_Functor, mode> type;
 };
 
-template<typename _Functor, NumericalDiffMode mode = CentralSecond>
+template <typename _Functor, NumericalDiffMode mode = CentralSecond>
 struct NumericalDiffTraits {
-  typedef typename NumericalDiffTraitsSelector<_Functor, mode, _Functor::InputsAtCompileTime>::type type;
+  typedef typename NumericalDiffTraitsSelector<_Functor, mode, _Functor::InputsAtCompileTime>::type
+      type;
 };
 
 }  // namespace common

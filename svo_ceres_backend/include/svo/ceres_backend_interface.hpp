@@ -1,25 +1,23 @@
 #pragma once
 
-#include <thread>
-#include <condition_variable>
 #include <math.h>
-
 #include <svo/abstract_bundle_adjustment.h>
+
+#include <condition_variable>
 #include <svo/vio_common/backend_types.hpp>
+#include <thread>
 
 #include "svo/ceres_backend/estimator.hpp"
 #include "svo/ceres_backend_publisher.hpp"
 
-namespace svo
-{
+namespace svo {
 // fwd
 struct MotionDetectorOptions;
 class MotionDetector;
 class OutlierRejection;
 class ImuHandler;
 
-struct CeresBackendOptions
-{
+struct CeresBackendOptions {
   // Optimization settings.
   /// (!) Maximum optimization time: this is only a soft limit, not guaranteed
   double max_iteration_time = -1;
@@ -57,8 +55,7 @@ struct CeresBackendOptions
   size_t max_fixed_lm_in_ceres_ = 50u;
 };
 
-struct CeresBackendInterfaceOptions
-{
+struct CeresBackendInterfaceOptions {
   /// (!) Only add landmarks to backend with minimum number of observations
   size_t min_num_obs = 2u;
 
@@ -107,15 +104,13 @@ struct CeresBackendInterfaceOptions
 typedef std::pair<size_t, size_t> CorrespondencePair;
 typedef std::vector<CorrespondencePair> CorrespondIds;
 
-class CeresBackendInterface : public AbstractBundleAdjustment
-{
-public:
+class CeresBackendInterface : public AbstractBundleAdjustment {
+ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   typedef std::shared_ptr<CeresBackendInterface> Ptr;
 
   CeresBackendInterfaceOptions options_;
   CeresBackendOptions optimizer_options_;
-
 
   CeresBackendInterface(const CeresBackendInterfaceOptions& options,
                         const CeresBackendOptions& optimizer_options,
@@ -133,8 +128,7 @@ public:
    *        for new frames
    */
   void loadMapFromBundleAdjustment(const FrameBundlePtr& new_frames,
-                                   const FrameBundlePtr& last_frames,
-                                   const MapPtr& map,
+                                   const FrameBundlePtr& last_frames, const MapPtr& map,
                                    bool& have_motion_prior) override;
 
   /**
@@ -174,9 +168,8 @@ public:
    * @param[out]  publisher Publisher handle, shared with frontend for
    *              benchmarking purposes.
    */
-  void makePublisher(const ros::NodeHandle& nh_private,
-                     std::shared_ptr<CeresBackendPublisher>& publisher)
-  {
+  void makePublisher(std::shared_ptr<rclcpp::Node> nh_private,
+                     std::shared_ptr<CeresBackendPublisher>& publisher) {
     publisher_.reset(new CeresBackendPublisher(nh_private, backend_.getMap()));
     publisher = publisher_;
   }
@@ -205,41 +198,27 @@ public:
    * @param[in] None
    * @param[out] The speed bias and pose of the latest imu frame
    */
-  void getLatestSpeedBiasPose(Eigen::Matrix<double, 9, 1>* speed_bias,
-                              Transformation* T_WS,
+  void getLatestSpeedBiasPose(Eigen::Matrix<double, 9, 1>* speed_bias, Transformation* T_WS,
                               double* timestamp) const override;
 
-  void setReinitStartValues(const Eigen::Matrix<double, 9, 1>& sb,
-                            const Transformation& Tws,
+  void setReinitStartValues(const Eigen::Matrix<double, 9, 1>& sb, const Transformation& Tws,
                             const double timestamp) override;
 
   /**
    * @brief getNumFrames returns the number of frames in backend
    * @return
    */
-  inline int getNumFrames() const override
-  {
-    return static_cast<int>(backend_.numFrames());
-  }
+  inline int getNumFrames() const override { return static_cast<int>(backend_.numFrames()); }
 
-  inline bool isFixedToGlobalMap() const override
-  {
-    return lock_to_fixed_landmarks_;
-  }
+  inline bool isFixedToGlobalMap() const override { return lock_to_fixed_landmarks_; }
 
-  inline BundleId lastOptimizedBundleId() const override
-  {
-    return last_optimized_nframe_.load();
-  }
+  inline BundleId lastOptimizedBundleId() const override { return last_optimized_nframe_.load(); }
 
-  inline void getLastState(ViNodeState* state) const override
-  {
-    *state = last_state_;
-  }
+  inline void getLastState(ViNodeState* state) const override { *state = last_state_; }
 
   std::string getStationaryStatusStr() const;
 
-protected:
+ protected:
   // modules
   Estimator backend_;
   std::shared_ptr<ImuHandler> imu_handler_;
@@ -260,8 +239,7 @@ protected:
    * @param frame_bundle to be added
    * @return true if successful
    */
-  bool
-  addStatesAndInertialMeasurementsToBackend(const FrameBundlePtr& frame_bundle);
+  bool addStatesAndInertialMeasurementsToBackend(const FrameBundlePtr& frame_bundle);
 
   /**
    * @brief Loop of optimization thread
@@ -277,17 +255,15 @@ protected:
   /**
    * @brief Update the state stored in the frame (bundle) with the backend
    */
-  void updateFrameStateWithBackend(const FramePtr& frame,
-                                   const bool get_speed_bias);
-  void updateBundleStateWithBackend(const FrameBundlePtr& frames,
-                                    const bool get_speed_bias);
+  void updateFrameStateWithBackend(const FramePtr& frame, const bool get_speed_bias);
+  void updateBundleStateWithBackend(const FrameBundlePtr& frames, const bool get_speed_bias);
 
   // Threading
   mutable std::condition_variable wait_condition_;
   mutable std::mutex mutex_backend_;
   mutable std::mutex loopclosinginfo_;
   std::unique_ptr<std::thread> thread_;
-  std::atomic_bool stop_thread_{ false };
+  std::atomic_bool stop_thread_{false};
 
   // state
   // bundle id for which the IMU messages are added
@@ -296,12 +272,12 @@ protected:
   BundleId last_added_nframe_images_ = -1;
   // book keeping for the time
   int64_t last_added_frame_stamp_ns_ = 0;
-  // the bundle id for which the optimized states have been 
+  // the bundle id for which the optimized states have been
   // updated in the fronend
   BundleId last_updated_nframe_ = -1;
 
   // the bundle id for which the backend has finished optimization
-  std::atomic<BundleId> last_optimized_nframe_ {-1};
+  std::atomic<BundleId> last_optimized_nframe_{-1};
 
   // variables for handling optimization choices
   bool skip_optimization_once_ = false;
@@ -323,7 +299,7 @@ protected:
   std::unordered_map<BundleId, vk::Timer> timers_;
 
   // fixation
-  std::atomic_bool lock_to_fixed_landmarks_ {false};
+  std::atomic_bool lock_to_fixed_landmarks_{false};
   uint64_t global_landmark_value_version_ = 0u;
   bool image_motion_detector_stationary_ = false;
   bool imu_motion_detector_stationary_ = false;

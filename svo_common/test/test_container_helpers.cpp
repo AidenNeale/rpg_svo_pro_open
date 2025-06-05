@@ -1,9 +1,9 @@
-#include "svo/common/container_helpers.h"
+#include <aslam/common/entrypoint.h>
+#include <gtest/gtest.h>
 
 #include <algorithm>
 
-#include <aslam/common/entrypoint.h>
-#include <gtest/gtest.h>
+#include "svo/common/container_helpers.h"
 
 namespace svo {
 namespace common {
@@ -14,7 +14,7 @@ class ContainerHelpersTest : public ::testing::Test {
   const std::vector<int> original_ = std::vector<int>({0, 1, 2, 3, 4});
 
   bool checkEraseIndicesFromVector(const std::vector<size_t>& to_remove,
-             const std::vector<int>& expected) {
+                                   const std::vector<int>& expected) {
     std::vector<int> copy(original_);
     eraseIndicesFromVector(to_remove, &copy);
     return std::equal(copy.begin(), copy.end(), expected.begin());

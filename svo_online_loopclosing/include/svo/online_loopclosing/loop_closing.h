@@ -12,53 +12,40 @@
 
 #pragma once
 
-#include <thread>
-#include <mutex>
-#include <memory>
-#include <map>
-#include <list>
-#include <deque>
-#include <fstream>
-
-#include <vikit/timer.h>
-#include <vikit/cameras/ncamera.h>
-#include <vikit/cameras/camera_geometry_base.h>
+#include <rpg_common/aligned.h>
+#include <rpg_common/eigen_type.h>
 #include <svo/common/frame.h>
 #include <svo/common/point.h>
 #include <svo/pgo/pgo.h>
-#include <rpg_common/eigen_type.h>
-#include <rpg_common/aligned.h>
-#include <ros/ros.h>
+#include <vikit/cameras/camera_geometry_base.h>
+#include <vikit/cameras/ncamera.h>
+#include <vikit/timer.h>
 
+#include <deque>
+#include <fstream>
+#include <list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <thread>
+
+#include "keyframe.h"
 #include "svo/online_loopclosing/bow.h"
 #include "svo/online_loopclosing/geometric_verification.h"
-#include "svo/online_loopclosing/read_file.h"
 #include "svo/online_loopclosing/loop_closing_types.h"
-#include "keyframe.h"
+#include "svo/online_loopclosing/read_file.h"
 
-namespace svo
-{
-enum class LCScaleRetMethod
-{
-  kCommonLandmarks = 0,
-  kMixedKeyPoints = 1,
-  kNone = 2
-};
+namespace svo {
+enum class LCScaleRetMethod { kCommonLandmarks = 0, kMixedKeyPoints = 1, kNone = 2 };
 
-enum class GlobalMapType
-{
-  kBuiltInPoseGraph = 0,
-  kExternalGlobalMap = 1,
-  kNone = 2
-};
+enum class GlobalMapType { kBuiltInPoseGraph = 0, kExternalGlobalMap = 1, kNone = 2 };
 
 extern std::map<std::string, LCScaleRetMethod> kStrToScaleRetMap;
 extern std::map<std::string, GlobalMapType> kStrToGlobalMapType;
 
 class MapAlignmentSE3;
 
-struct LoopClosureOptions
-{
+struct LoopClosureOptions {
   /*Whether to run loop closure detection or not*/
   bool runlc;
 
@@ -124,13 +111,11 @@ struct LoopClosureOptions
 /* Forward Declaration */
 class KeyFrame;
 
-class LoopClosing
-{
-public:
+class LoopClosing {
+ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   /*default constructor*/
-  LoopClosing(const LoopClosureOptions& loopclosure_options,
-              const CameraBundle::Ptr& cams_);
+  LoopClosing(const LoopClosureOptions& loopclosure_options, const CameraBundle::Ptr& cams_);
 
   /*destructor*/
   virtual ~LoopClosing();
@@ -140,8 +125,7 @@ public:
   void addFrameToPR(const svo::FrameBundlePtr& last_frames_);
 
   /* Function runPR: Runs place recognition online along with SVO pipeline */
-  void runPROnLatestKeyframe(const size_t ignored_frames,
-                             const bool run_lc_on_this_frame,
+  void runPROnLatestKeyframe(const size_t ignored_frames, const bool run_lc_on_this_frame,
                              const double score_expected);
 
   void svoFrameToKeyframe(const svo::FramePtr& frame, KeyFrame* kf) const;
@@ -151,19 +135,14 @@ public:
    * pose information if the keyframe with the given id exists in pose graph */
   void updateKeyframe(const svo::FramePtr& frame);
 
-  inline int findKfIndexByNFrameID(const int nframe_id)
-  {
-    auto it = std::find_if(kf_list_.begin(), kf_list_.end(),
-                           [&nframe_id](const KeyFramePtr& kf) {
-                             return kf->NframeID_ == nframe_id;
-                           });
+  inline int findKfIndexByNFrameID(const int nframe_id) {
+    auto it = std::find_if(kf_list_.begin(), kf_list_.end(), [&nframe_id](const KeyFramePtr& kf) {
+      return kf->NframeID_ == nframe_id;
+    });
 
-    if (it == kf_list_.end())
-    {
+    if (it == kf_list_.end()) {
       return -1;
-    }
-    else
-    {
+    } else {
       return static_cast<int>(it - kf_list_.begin());
     }
   }
@@ -175,12 +154,11 @@ public:
   /*
    * undistort and normalise keypoints using camera matrix
    */
-  void undistortAndNormalise(
-      const std::vector<cv::Point2f>& keypoints_cf,
-      const std::vector<cv::Point2f>& keypoints_lc, const cv::Mat& K,
-      const Eigen::VectorXd& dist_par,
-      std::vector<cv::Point2f>* keypoints_matched_norm_udist_cf,
-      std::vector<cv::Point2f>* keypoints_matched_norm_udist_lc);
+  void undistortAndNormalise(const std::vector<cv::Point2f>& keypoints_cf,
+                             const std::vector<cv::Point2f>& keypoints_lc, const cv::Mat& K,
+                             const Eigen::VectorXd& dist_par,
+                             std::vector<cv::Point2f>* keypoints_matched_norm_udist_cf,
+                             std::vector<cv::Point2f>* keypoints_matched_norm_udist_lc);
 
   /*
    * This function effectively updates the keyframe database (given an index)
@@ -189,8 +167,7 @@ public:
    * database or when we update keyframe information
    * after a keyframe gets marginalised out of the sliding window.
    */
-  void updateSVOPointsDescriptors(const size_t kf_index,
-                                  const bool replace_mixed_features);
+  void updateSVOPointsDescriptors(const size_t kf_index, const bool replace_mixed_features);
 
   /*
    * We keep a rolling PGO ceres problem. After every PGO the sequential
@@ -203,22 +180,20 @@ public:
    * considered as loop candidates
    */
   inline bool proximityCheck(std::shared_ptr<KeyFrame> keyframe1,
-                             std::shared_ptr<KeyFrame> keyframe2)
-  {
-    return (keyframe1->T_w_c_.getPosition() - keyframe2->T_w_c_.getPosition())
-               .norm() <= prox_dist_thresh_;
+                             std::shared_ptr<KeyFrame> keyframe2) {
+    return (keyframe1->T_w_c_.getPosition() - keyframe2->T_w_c_.getPosition()).norm() <=
+           prox_dist_thresh_;
   }
 
   /*
    * This function updates the map points in the database to make sure they are
    * consistent with the current pose
    */
-  void updateMapPointsUsingDepth(
-      svo::Frame& frame, std::vector<cv::Point3f>& svo_landmarksvector,
-      const Transformation& pose, const BearingVecs& svo_bearingvector,
-      const std::vector<double>& svo_depthvector,
-      const FeatureTypes& svo_featuretypevector,
-      const std::vector<size_t>& svo_originalindicesvec);
+  void updateMapPointsUsingDepth(svo::Frame& frame, std::vector<cv::Point3f>& svo_landmarksvector,
+                                 const Transformation& pose, const BearingVecs& svo_bearingvector,
+                                 const std::vector<double>& svo_depthvector,
+                                 const FeatureTypes& svo_featuretypevector,
+                                 const std::vector<size_t>& svo_originalindicesvec);
 
   /*
    * This function traces the pose graph to a file
@@ -235,40 +210,27 @@ public:
    */
   bool traceNumQueryData(const std::string& path) const;
 
-  bool traceClosedLoops(const std::string& trace_dir,
-                        const std::string& suffix) const;
+  bool traceClosedLoops(const std::string& trace_dir, const std::string& suffix) const;
 
   // utilities
-  inline int getNumKeyframes() const
-  {
-    return svo_keyframe_count_;
-  }
+  inline int getNumKeyframes() const { return svo_keyframe_count_; }
 
   // get information for other modules, use with lock
-  inline bool hasCorrectionInfo() const
-  {
-    return !lc_correction_info_.empty();
-  }
+  inline bool hasCorrectionInfo() const { return !lc_correction_info_.empty(); }
 
-  inline void consumeOldestCorrection(Transformation* w_T_correction)
-  {
+  inline void consumeOldestCorrection(Transformation* w_T_correction) {
     (*w_T_correction) = lc_correction_info_.front().w_T_new_old_;
     lc_correction_info_.pop_front();
   }
 
-  inline void consumePointMatchInfo(MatchedPointsInfo* match_point_info)
-  {
-    if (!lc_matched_points_info_.empty())
-    {
+  inline void consumePointMatchInfo(MatchedPointsInfo* match_point_info) {
+    if (!lc_matched_points_info_.empty()) {
       *match_point_info = lc_matched_points_info_.front();
       lc_matched_points_info_.pop_front();
     }
   }
 
-  inline bool useExternalMap()
-  {
-    return global_map_type_ == GlobalMapType::kExternalGlobalMap;
-  }
+  inline bool useExternalMap() { return global_map_type_ == GlobalMapType::kExternalGlobalMap; }
 
   void updateKeyframePoses(const BundleIdToTwb& pose_map);
 
@@ -284,8 +246,7 @@ public:
 
   /* Hash map of valid loop closures. This is used to add constraints to pose
    * graph */
-  std::map<int, int, std::less<int>,
-           Eigen::aligned_allocator<std::pair<const int, int> > >
+  std::map<int, int, std::less<int>, Eigen::aligned_allocator<std::pair<const int, int> > >
       cur_kf_to_lc_kf_bundle_id_map_;
 
   // actual list of keyframes in the database
@@ -337,60 +298,49 @@ public:
   std::vector<double> transformmap_timing_;
   std::vector<int> num_queries_;
 
-  inline void addNewTimingSlot()
-  {
+  inline void addNewTimingSlot() {
     bow_timing_.push_back(0.0);
     gv_timing_.push_back(0.0);
     hm_timing_.push_back(0.0);
     transformmap_timing_.push_back(0.0);
   }
 
-  inline void clearStats()
-  {
+  inline void clearStats() {
     bow_timing_.clear();
     gv_timing_.clear();
     hm_timing_.clear();
     transformmap_timing_.clear();
   }
 
-  inline void constructLoopViz(const KeyFrame& cur_kf, const KeyFrame& lc_kf,
-                               LoopVizInfo* viz)
-  {
-    viz->block<1, 3>(0, 0) =
-        cur_kf.T_w_c_.getPosition().transpose().cast<float>();
-    viz->block<1, 3>(0, 3) =
-        lc_kf.T_w_c_.getPosition().transpose().cast<float>();
+  inline void constructLoopViz(const KeyFrame& cur_kf, const KeyFrame& lc_kf, LoopVizInfo* viz) {
+    viz->block<1, 3>(0, 0) = cur_kf.T_w_c_.getPosition().transpose().cast<float>();
+    viz->block<1, 3>(0, 3) = lc_kf.T_w_c_.getPosition().transpose().cast<float>();
   }
 
-  inline void setRecoveryMode(const bool recover=true)
-  {
+  inline void setRecoveryMode(const bool recover = true) {
     recovery_after_loss_ = recover;
     ignore_next_constraint_in_pg_ = recover;
   }
 
-  inline bool lastFinished() const
-  {
-    return completed_flags_.back();
-  }
+  inline bool lastFinished() const { return completed_flags_.back(); }
 
-private:
-  void extractAndConvert(
-      const svo::FramePtr& frame, double* current_frame_time_sec,
-      Transformation* Twc, std::vector<cv::Point2f>* current_frame_SVOkeypoints,
-      std::vector<cv::Point3f>* current_frame_SVOlandmarks_in_cam,
-      std::vector<int>* current_frame_SVOlandmark_ids_,
-      std::vector<double>* current_frame_SVOdepths,
-      FeatureTypes* current_frame_SVOtypevec,
-      std::vector<int>* current_frame_SVOtrackIDs,
-      BearingVecs* current_frame_SVObearingvectors,
-      std::vector<size_t>* current_frame_originalindices) const;
+ private:
+  void extractAndConvert(const svo::FramePtr& frame, double* current_frame_time_sec,
+                         Transformation* Twc, std::vector<cv::Point2f>* current_frame_SVOkeypoints,
+                         std::vector<cv::Point3f>* current_frame_SVOlandmarks_in_cam,
+                         std::vector<int>* current_frame_SVOlandmark_ids_,
+                         std::vector<double>* current_frame_SVOdepths,
+                         FeatureTypes* current_frame_SVOtypevec,
+                         std::vector<int>* current_frame_SVOtrackIDs,
+                         BearingVecs* current_frame_SVObearingvectors,
+                         std::vector<size_t>* current_frame_originalindices) const;
 
-  bool calculateTransformationInWorldFrame(
-      const std::vector<cv::Point3f>& landmarks_lc,
-      const std::vector<cv::Point3f>& landmarks_cf,
-      const CorrespondIds& point_correspondences, const int& current_frame_id,
-      const int& lc_frame_id, Transformation* w_T_new_old,
-      std::vector<int>* inlier_indices);
+  bool calculateTransformationInWorldFrame(const std::vector<cv::Point3f>& landmarks_lc,
+                                           const std::vector<cv::Point3f>& landmarks_cf,
+                                           const CorrespondIds& point_correspondences,
+                                           const int& current_frame_id, const int& lc_frame_id,
+                                           Transformation* w_T_new_old,
+                                           std::vector<int>* inlier_indices);
 
   /* This is used to obtain expected BOW score */
   std::vector<DBoW2::BowVector> svokf_bow_vec_;

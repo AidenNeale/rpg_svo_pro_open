@@ -1,11 +1,23 @@
+cmake_minimum_required(VERSION 3.8)
 project(svo_online_loopclosing)
-cmake_minimum_required(VERSION 2.8.3)
 
-find_package(catkin_simple REQUIRED)
-catkin_simple(ALL_DEPS_REQUIRED)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_BUILD_TYPE Release)
+
+find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(DBoW2 REQUIRED)
+find_package(opengv REQUIRED)
 
-include(SvoSetup)
+find_package(vikit_common REQUIRED)
+find_package(vikit_cameras REQUIRED)
+find_package(svo_common REQUIRED)
+find_package(svo_pgo REQUIRED)
+find_package(rpg_common REQUIRED)
+
 
 set(HEADERS
   include/svo/online_loopclosing/bow.h
@@ -25,15 +37,48 @@ set(SOURCES
   src/map_alignment.cpp
   )
 
-#add_executable(svo_online_loopclosing ${SOURCES} ${HEADERS})
-cs_add_library(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES})
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+target_include_directories(${PROJECT_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(${PROJECT_NAME} rclcpp DBoW2 opengv svo_common svo_pgo rpg_common vikit_common vikit_cameras)
+target_link_libraries(${PROJECT_NAME} opengv ${OpenCV_LIBRARIES} Eigen3::Eigen)
 
-cs_add_library(bow src/bow.cpp include/svo/online_loopclosing/bow.h)
-target_link_libraries(bow ${OpenCV_LIBRARIES})
+add_library(bow src/bow.cpp)
+target_include_directories(bow
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(bow DBoW2 opengv svo_common vikit_common)
+target_link_libraries(bow ${OpenCV_LIBRARIES} opengv Eigen3::Eigen)
 
-cs_add_executable(createvoc test/createvoc.cpp)
+add_executable(createvoc test/createvoc.cpp)
+ament_target_dependencies(createvoc ament_index_cpp)
 target_link_libraries(createvoc bow)
 
-cs_install()
-cs_export()
+################################################################################
+
+# Install library and headers
+install(TARGETS ${PROJECT_NAME} bow
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+install(DIRECTORY include/
+  DESTINATION include/
+)
+install(DIRECTORY vocabularies
+  DESTINATION share/${PROJECT_NAME}/
+)
+
+ament_export_libraries(${PROJECT_NAME} bow)
+ament_export_include_directories(include)
+ament_export_dependencies(
+  svo_pgo
+  opengv
+  DBoW2
+)
+ament_package()

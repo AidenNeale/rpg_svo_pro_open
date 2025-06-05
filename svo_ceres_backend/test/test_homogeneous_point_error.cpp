@@ -5,7 +5,7 @@
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright notice,
  *     this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright notice,
@@ -32,10 +32,10 @@
  *    Modified: Zurich Eye
  *********************************************************************************/
 
-#include <memory>
+#include <aslam/common/entrypoint.h>
 #include <gtest/gtest.h>
 
-#include <aslam/common/entrypoint.h>
+#include <memory>
 #include <svo/vio_common/test_utils.hpp>
 
 #include "svo/ceres_backend/homogeneous_point_error.hpp"
@@ -43,9 +43,7 @@
 #include "svo/ceres_backend/homogeneous_point_parameter_block.hpp"
 #include "svo/ceres_backend/map.hpp"
 
-
-TEST(okvisTestSuite, HomogeneousPointError)
-{
+TEST(okvisTestSuite, HomogeneousPointError) {
   constexpr bool deterministic = true;
   constexpr size_t n_points = 100;
   constexpr double jacobian_rel_tol = 1e-6;
@@ -54,17 +52,15 @@ TEST(okvisTestSuite, HomogeneousPointError)
   svo::ceres_backend::Map map;
 
   Eigen::Matrix<svo::FloatType, 4, Eigen::Dynamic, Eigen::ColMajor> points =
-      svo::test_utils::randomMatrixNormalDistributed<4, n_points>(deterministic,
-                                                                  0.0, 100.0);
+      svo::test_utils::randomMatrixNormalDistributed<4, n_points>(deterministic, 0.0, 100.0);
   points.bottomLeftCorner<1, n_points>().setZero();
-  for (size_t i = 0; i < n_points; ++i)
-  {
+  for (size_t i = 0; i < n_points; ++i) {
     Eigen::Vector4d point = points.col(i);
 
     // create parameter block
     std::shared_ptr<svo::ceres_backend::HomogeneousPointParameterBlock>
         homogeneousPointParameterBlock(
-          new svo::ceres_backend::HomogeneousPointParameterBlock(point, i));
+            new svo::ceres_backend::HomogeneousPointParameterBlock(point, i));
     // add it as optimizable thing.
     map.addParameterBlock(homogeneousPointParameterBlock,
                           svo::ceres_backend::Map::HomogeneousPoint);
@@ -72,12 +68,12 @@ TEST(okvisTestSuite, HomogeneousPointError)
 
     // invent a point error
     std::shared_ptr<svo::ceres_backend::HomogeneousPointError> homogeneousPointError(
-        new svo::ceres_backend::HomogeneousPointError(
-            homogeneousPointParameterBlock->estimate(), 0.1));
+        new svo::ceres_backend::HomogeneousPointError(homogeneousPointParameterBlock->estimate(),
+                                                      0.1));
 
     // add it
-    ceres::ResidualBlockId id = map.addResidualBlock(
-        homogeneousPointError, nullptr, homogeneousPointParameterBlock);
+    ceres::ResidualBlockId id =
+        map.addResidualBlock(homogeneousPointError, nullptr, homogeneousPointParameterBlock);
 
     // disturb
     Eigen::Vector4d point_disturbed = point;

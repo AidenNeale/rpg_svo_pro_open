@@ -10,8 +10,8 @@
  *  Author: kunal71091
  */
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <fstream>
-#include <ros/package.h>
 
 #include "svo/online_loopclosing/bow.h"
 
@@ -19,12 +19,9 @@ using namespace std;
 using namespace svo;
 using namespace DBoW2;
 
-int main(int argc, char* argv[])
-{
-  if (argc < 2)
-  {
-    std::cerr << "Provide Image Directory Path and Vocabulary name"
-              << std::endl;
+int main(int argc, char* argv[]) {
+  if (argc < 2) {
+    std::cerr << "Provide Image Directory Path and Vocabulary name" << std::endl;
     return 1;
   }
   string folder_location = std::string(argv[1]);
@@ -34,15 +31,14 @@ int main(int argc, char* argv[])
   const WeightingType weight = TF_IDF;
   const ScoringType score = BHATTACHARYYA;
   stringstream voc_save_path_;
-  voc_save_path_ << ros::package::getPath("svo_online_loopclosing") << "/vocabu"
-                                                                       "laries";
+  voc_save_path_ << ament_index_cpp::get_package_share_directory("svo_online_loopclosing")
+                 << "/vocabularies";
   string voc_save_path = voc_save_path_.str();
 
   string voc_name = std::string(argv[2]);
   vector<vector<cv::Mat>> features;
   extractFeaturesFromFolder(folder_location, &features);
-  OrbVocabulary voc =
-      createVoc(features, voc_save_path, voc_name, k, L, weight, score);
+  OrbVocabulary voc = createVoc(features, voc_save_path, voc_name, k, L, weight, score);
 
   return 0;
 }

@@ -5,7 +5,7 @@
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright notice,
  *     this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright notice,
@@ -63,22 +63,27 @@ namespace ceres_backend {
 ///        This way, we can easily manipulate the optimisation problem.
 ///        You could argue why not use cere's internal mechanisms to do that.
 ///        We found that our implementation was faster...
-class Map
-{
+class Map {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   /// @brief Constructor.
   Map();
 
+  /// @brief
+  /// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  /// @param  /
+  //   Map(const Map&) = delete;
+  //   Map& operator=(const Map&) = delete;
+
+  ~Map() { std::cout << "Map destructor called" << std::endl; }
+
   // definitions
   /// @brief Struct to store some infos about a residual.
-  struct ResidualBlockSpec
-  {
+  struct ResidualBlockSpec {
     ResidualBlockSpec()
         : residual_block_id(0),
           loss_function_ptr(0),
-          error_interface_ptr(std::shared_ptr<ErrorInterface>())
-    {}
+          error_interface_ptr(std::shared_ptr<ErrorInterface>()) {}
 
     /// @brief Constructor
     /// @param[in] residual_block_id ID of residual block.
@@ -90,26 +95,23 @@ class Map
                       std::shared_ptr<ErrorInterface> error_interface_ptr)
         : residual_block_id(residual_block_id),
           loss_function_ptr(loss_function_ptr),
-          error_interface_ptr(error_interface_ptr)
-    {}
+          error_interface_ptr(error_interface_ptr) {}
 
-    ceres::ResidualBlockId residual_block_id; ///< ID of residual block.
-    ceres::LossFunction* loss_function_ptr; ///< The m-estimator.
+    ceres::ResidualBlockId residual_block_id;  ///< ID of residual block.
+    ceres::LossFunction* loss_function_ptr;    ///< The m-estimator.
     std::shared_ptr<ErrorInterface> error_interface_ptr;
     ///< The pointer to the error interface of the respective residual block.
   };
-  typedef std::pair<uint64_t,
-  std::shared_ptr<ceres_backend::ParameterBlock> > ParameterBlockSpec;
+  typedef std::pair<uint64_t, std::shared_ptr<ceres_backend::ParameterBlock> > ParameterBlockSpec;
 
   typedef std::vector<ResidualBlockSpec> ResidualBlockCollection;
   typedef std::vector<ParameterBlockSpec> ParameterBlockCollection;
 
   /// @brief The Parameterisation enum
-  enum Parameterization
-  {
-    HomogeneousPoint,     ///< Use ceres_backend::HomogeneousPointLocalParameterization.
-    Pose6d,               ///< Use ceres_backend::PoseLocalParameterization.
-    Trivial               ///< No local parameterisation.
+  enum Parameterization {
+    HomogeneousPoint,  ///< Use ceres_backend::HomogeneousPointLocalParameterization.
+    Pose6d,            ///< Use ceres_backend::PoseLocalParameterization.
+    Trivial            ///< No local parameterisation.
   };
 
   /**
@@ -149,9 +151,8 @@ class Map
    * @param group             Schur elimination group -- currently unused.
    * @return True if successful.
    */
-  bool addParameterBlock(
-      std::shared_ptr<ceres_backend::ParameterBlock> parameter_block,
-      int parameterization = Parameterization::Trivial, const int group = -1);
+  bool addParameterBlock(std::shared_ptr<ceres_backend::ParameterBlock> parameter_block,
+                         int parameterization = Parameterization::Trivial, const int group = -1);
 
   /**
    * @brief Remove a parameter block from the map.
@@ -165,8 +166,7 @@ class Map
    * @param parameter_block Pointer to the block to remove.
    * @return True if successful.
    */
-  bool removeParameterBlock(
-      std::shared_ptr<ceres_backend::ParameterBlock> parameter_block);
+  bool removeParameterBlock(std::shared_ptr<ceres_backend::ParameterBlock> parameter_block);
 
   /**
    * @brief Adds a residual block.
@@ -177,8 +177,7 @@ class Map
    * @return
    */
   ceres::ResidualBlockId addResidualBlock(
-      std::shared_ptr< ceres::CostFunction> cost_function,
-      ceres::LossFunction* loss_function,
+      std::shared_ptr<ceres::CostFunction> cost_function, ceres::LossFunction* loss_function,
       std::vector<std::shared_ptr<ceres_backend::ParameterBlock> >& parameter_block_ptrs);
 
   /**
@@ -209,28 +208,27 @@ class Map
    * @param[in] x9 The 10th parameter block (if existent).
    * @return The residual block ID, i.e. what cost_function points to.
    */
-  ceres::ResidualBlockId addResidualBlock(
-      std::shared_ptr< ceres::CostFunction> cost_function,
-      ceres::LossFunction* loss_function,
-      std::shared_ptr<ceres_backend::ParameterBlock> x0,
-      std::shared_ptr<ceres_backend::ParameterBlock> x1 = std::shared_ptr<
-          ceres_backend::ParameterBlock>(),
-      std::shared_ptr<ceres_backend::ParameterBlock> x2 = std::shared_ptr<
-          ceres_backend::ParameterBlock>(),
-      std::shared_ptr<ceres_backend::ParameterBlock> x3 = std::shared_ptr<
-          ceres_backend::ParameterBlock>(),
-      std::shared_ptr<ceres_backend::ParameterBlock> x4 = std::shared_ptr<
-          ceres_backend::ParameterBlock>(),
-      std::shared_ptr<ceres_backend::ParameterBlock> x5 = std::shared_ptr<
-          ceres_backend::ParameterBlock>(),
-      std::shared_ptr<ceres_backend::ParameterBlock> x6 = std::shared_ptr<
-          ceres_backend::ParameterBlock>(),
-      std::shared_ptr<ceres_backend::ParameterBlock> x7 = std::shared_ptr<
-          ceres_backend::ParameterBlock>(),
-      std::shared_ptr<ceres_backend::ParameterBlock> x8 = std::shared_ptr<
-          ceres_backend::ParameterBlock>(),
-      std::shared_ptr<ceres_backend::ParameterBlock> x9 = std::shared_ptr<
-          ceres_backend::ParameterBlock>());
+  ceres::ResidualBlockId addResidualBlock(std::shared_ptr<ceres::CostFunction> cost_function,
+                                          ceres::LossFunction* loss_function,
+                                          std::shared_ptr<ceres_backend::ParameterBlock> x0,
+                                          std::shared_ptr<ceres_backend::ParameterBlock> x1 =
+                                              std::shared_ptr<ceres_backend::ParameterBlock>(),
+                                          std::shared_ptr<ceres_backend::ParameterBlock> x2 =
+                                              std::shared_ptr<ceres_backend::ParameterBlock>(),
+                                          std::shared_ptr<ceres_backend::ParameterBlock> x3 =
+                                              std::shared_ptr<ceres_backend::ParameterBlock>(),
+                                          std::shared_ptr<ceres_backend::ParameterBlock> x4 =
+                                              std::shared_ptr<ceres_backend::ParameterBlock>(),
+                                          std::shared_ptr<ceres_backend::ParameterBlock> x5 =
+                                              std::shared_ptr<ceres_backend::ParameterBlock>(),
+                                          std::shared_ptr<ceres_backend::ParameterBlock> x6 =
+                                              std::shared_ptr<ceres_backend::ParameterBlock>(),
+                                          std::shared_ptr<ceres_backend::ParameterBlock> x7 =
+                                              std::shared_ptr<ceres_backend::ParameterBlock>(),
+                                          std::shared_ptr<ceres_backend::ParameterBlock> x8 =
+                                              std::shared_ptr<ceres_backend::ParameterBlock>(),
+                                          std::shared_ptr<ceres_backend::ParameterBlock> x9 =
+                                              std::shared_ptr<ceres_backend::ParameterBlock>());
 
   /**
    * @brief Remove a residual block.
@@ -266,26 +264,20 @@ class Map
    * @param[in] parameter_block Pointer to the parameter block that should be constant.
    * @return True on success.
    */
-  bool setParameterBlockConstant(
-      std::shared_ptr<ceres_backend::ParameterBlock> parameter_block)
-  {
+  bool setParameterBlockConstant(std::shared_ptr<ceres_backend::ParameterBlock> parameter_block) {
     return setParameterBlockConstant(parameter_block->id());
   }
 
-  bool isParameterBlockConstant(
-      std::shared_ptr<ceres_backend::ParameterBlock> parameter_block)
-  {
+  bool isParameterBlockConstant(std::shared_ptr<ceres_backend::ParameterBlock> parameter_block) {
     return isParameterBlockConstant(parameter_block->id());
   }
-
 
   /**
    * @brief Optimise a certain parameter block (this is the default).
    * @param[in] parameter_block Pointer to the parameter block that should be optimised.
    * @return True on success.
    */
-  bool setParameterBlockVariable(
-      std::shared_ptr<ceres_backend::ParameterBlock> parameter_block) {
+  bool setParameterBlockVariable(std::shared_ptr<ceres_backend::ParameterBlock> parameter_block) {
     return setParameterBlockVariable(parameter_block->id());
   }
 
@@ -304,9 +296,7 @@ class Map
    * @param[in] local_parameterization Give it an actual local parameterisation object.
    * @return True on success.
    */
-  bool setParameterization(
-      uint64_t parameter_block_id,
-      ceres::LocalParameterization* local_parameterization);
+  bool setParameterization(uint64_t parameter_block_id, ceres::Manifold* local_parameterization);
 
   /**
    * @brief Set the (local) parameterisation of a parameter block.
@@ -314,10 +304,8 @@ class Map
    * @param[in] local_parameterization Give it an actual local parameterisation object.
    * @return True on success.
    */
-  bool setParameterization(
-      std::shared_ptr<ceres_backend::ParameterBlock> parameter_block,
-      ceres::LocalParameterization* local_parameterization)
-  {
+  bool setParameterization(std::shared_ptr<ceres_backend::ParameterBlock> parameter_block,
+                           ceres::Manifold* local_parameterization) {
     return setParameterization(parameter_block->id(), local_parameterization);
   }
 
@@ -368,22 +356,17 @@ class Map
 
   // access to the map as such
   /// \brief The actual map from Id to parameter block pointer.
-  typedef std::unordered_map<uint64_t,
-      std::shared_ptr<ceres_backend::ParameterBlock> > IdToParameterBlockMap;
+  typedef std::unordered_map<uint64_t, std::shared_ptr<ceres_backend::ParameterBlock> >
+      IdToParameterBlockMap;
 
   /// \brief The actual map from Id to residual block specs.
   typedef std::unordered_map<ceres::ResidualBlockId, ResidualBlockSpec>
-  ResidualBlockIdToResidualBlockSpecMap;
+      ResidualBlockIdToResidualBlockSpecMap;
 
   /// @brief Get map connecting parameter block IDs to parameter blocks
-  const IdToParameterBlockMap& idToParameterBlockMap() const
-  {
-    return id_to_parameter_block_map_;
-  }
+  const IdToParameterBlockMap& idToParameterBlockMap() const { return id_to_parameter_block_map_; }
   /// @brief Get the actual map from Id to residual block specs.
-  const ResidualBlockIdToResidualBlockSpecMap&
-  residualBlockIdToResidualBlockSpecMap() const
-  {
+  const ResidualBlockIdToResidualBlockSpecMap& residualBlockIdToResidualBlockSpecMap() const {
     return residual_block_id_to_residual_block_spec_map_;
   }
 
@@ -395,13 +378,9 @@ class Map
   ceres::Solver::Summary summary;
 
   /// @brief Solve the optimization problem.
-  void solve()
-  {
-    Solve(options, problem_.get(), &summary);
-  }
+  void solve() { Solve(options, problem_.get(), &summary); }
 
  protected:
-
   /// \brief count the inserted residual blocks.
   uint64_t residual_counter_;
 
@@ -411,12 +390,11 @@ class Map
 
   // the actual maps
   /// \brief Go from Id to residual block pointer.
-  typedef std::unordered_multimap<uint64_t,
-  ResidualBlockSpec> IdToResidualBlockMultimap;
+  typedef std::unordered_multimap<uint64_t, ResidualBlockSpec> IdToResidualBlockMultimap;
 
   /// \brief Go from residual block id to its parameter blocks.
-  typedef std::unordered_map<ceres::ResidualBlockId,
-      ParameterBlockCollection> ResidualBlockIdToParameterBlockCollectionMap;
+  typedef std::unordered_map<ceres::ResidualBlockId, ParameterBlockCollection>
+      ResidualBlockIdToParameterBlockCollectionMap;
 
   /// \brief The map connecting parameter block ID's and parameter blocks
   IdToParameterBlockMap id_to_parameter_block_map_;
@@ -428,16 +406,14 @@ class Map
   IdToResidualBlockMultimap id_to_residual_block_multimap_;
 
   /// \brief Go from residual block id to its parameter blocks.
-  ResidualBlockIdToParameterBlockCollectionMap
-  residual_block_id_to_parameter_block_collection_map_;
+  ResidualBlockIdToParameterBlockCollectionMap residual_block_id_to_parameter_block_collection_map_;
 
   /// \brief Store parameterisation locally.
-  ceres_backend::HomogeneousPointLocalParameterization
-  homogeneous_point_local_parameterization_;
+  ceres_backend::HomogeneousPointLocalParameterization homogeneous_point_local_parameterization_;
 
   /// \brief Store parameterisation locally.
   ceres_backend::PoseLocalParameterization pose_local_parameterization_;
 };
 
-}  //namespace svo
-}  //namespace ceres_backend
+}  // namespace ceres_backend
+}  // namespace svo

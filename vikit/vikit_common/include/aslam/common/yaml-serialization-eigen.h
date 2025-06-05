@@ -2,10 +2,10 @@
 #define ASLAM_CV_COMMON_EIGEN_YAML_SERIALIZATION_H_
 
 #include <Eigen/Core>
-#include <glog/logging.h>
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include <yaml-cpp/yaml.h>
 #pragma diagnostic pop
+#include <iostream>
 
 namespace YAML {  // This has to be in the same namespace as the Emitter.
 // yaml serialization helper function for the Eigen3 Matrix object.
@@ -21,8 +21,12 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
     IndexType cols = M.cols();
     node["rows"] = rows;
     node["cols"] = cols;
-    CHECK_GT(rows, 0);
-    CHECK_GT(cols, 0);
+    if (rows <= 0) {
+      throw std::runtime_error("YAML encode: rows <= 0");
+    }
+    if (cols <= 0) {
+      throw std::runtime_error("YAML encode: cols <= 0");
+    }
     for (IndexType i = 0; i < rows; ++i) {
       for (IndexType j = 0; j < cols; ++j) {
         node["data"].push_back(M(i, j));
@@ -32,10 +36,9 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
   }
 
   template <class Scalar, int A, int B, int C, int D, int E>
-  static bool decode(const Node& node,
-                     Eigen::Matrix<Scalar, A, B, C, D, E>& M) {
-    if(!node.IsMap()) {
-      LOG(ERROR) << "Unable to get parse the matrix because the node is not a map.";
+  static bool decode(const Node& node, Eigen::Matrix<Scalar, A, B, C, D, E>& M) {
+    if (!node.IsMap()) {
+      std::cerr << "Unable to get parse the matrix because the node is not a map.";
       return false;
     }
 
@@ -43,20 +46,20 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
     IndexType rows = node["rows"].as<IndexType>();
     IndexType cols = node["cols"].as<IndexType>();
 
-    if(rows != A || cols != B) {
-      LOG(ERROR) << "The matrix is the wrong size (rows, cols). Wanted: (" << A << ","
-          << B << "), got (" << rows << ", " << cols << ")";
+    if (rows != A || cols != B) {
+      std::cerr << "The matrix is the wrong size (rows, cols). Wanted: (" << A << "," << B
+                << "), got (" << rows << ", " << cols << ")";
       return false;
     }
 
     size_t expected_size = M.rows() * M.cols();
     if (!node["data"].IsSequence()) {
-      LOG(ERROR) << "The matrix data is not a sequence.";
+      std::cerr << "The matrix data is not a sequence.";
       return false;
     }
-    if(node["data"].size() != expected_size) {
-      LOG(ERROR) << "The data sequence is the wrong size. Wanted: " << expected_size <<
-          ", got: " << node["data"].size();
+    if (node["data"].size() != expected_size) {
+      std::cerr << "The data sequence is the wrong size. Wanted: " << expected_size
+                << ", got: " << node["data"].size();
       return false;
     }
 
@@ -65,7 +68,9 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
     if (rows > 0 && cols > 0) {
       for (IndexType i = 0; i < rows; ++i) {
         for (IndexType j = 0; j < cols; ++j) {
-          CHECK(it != it_end);
+          if (it == it_end) {
+            throw std::runtime_error("YAML decode: Unexpected end of data sequence.");
+          }
           M(i, j) = it->as<Scalar>();
           ++it;
         }
@@ -75,21 +80,19 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
   }
 
   template <class Scalar, int B, int C, int D, int E>
-  static bool decode(const Node& node,
-                     Eigen::Matrix<Scalar, Eigen::Dynamic, B, C, D, E>& M) {
-    if(!node.IsMap()) {
-      LOG(ERROR) << "Unable to get parse the matrix because the node is not a map.";
+  static bool decode(const Node& node, Eigen::Matrix<Scalar, Eigen::Dynamic, B, C, D, E>& M) {
+    if (!node.IsMap()) {
+      std::cerr << "Unable to get parse the matrix because the node is not a map.";
       return false;
     }
 
-    typedef typename Eigen::Matrix<Scalar, Eigen::Dynamic, B, C, D, E>::Index
-        IndexType;
+    typedef typename Eigen::Matrix<Scalar, Eigen::Dynamic, B, C, D, E>::Index IndexType;
     IndexType rows = node["rows"].as<IndexType>();
     IndexType cols = node["cols"].as<IndexType>();
 
-    if(cols != B) {
-      LOG(ERROR) << "The matrix is the wrong size (rows, cols). Wanted: (" << rows << ","
-          << B << "), got (" << rows << ", " << cols << ")";
+    if (cols != B) {
+      std::cerr << "The matrix is the wrong size (rows, cols). Wanted: (" << rows << "," << B
+                << "), got (" << rows << ", " << cols << ")";
       return false;
     }
 
@@ -97,12 +100,12 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
 
     size_t expected_size = M.rows() * M.cols();
     if (!node["data"].IsSequence()) {
-      LOG(ERROR) << "The matrix data is not a sequence.";
+      std::cerr << "The matrix data is not a sequence.";
       return false;
     }
-    if(node["data"].size() != expected_size) {
-      LOG(ERROR) << "The data sequence is the wrong size. Wanted: " << expected_size <<
-          ", got: " << node["data"].size();
+    if (node["data"].size() != expected_size) {
+      std::cerr << "The data sequence is the wrong size. Wanted: " << expected_size
+                << ", got: " << node["data"].size();
       return false;
     }
 
@@ -111,7 +114,9 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
     if (rows > 0 && cols > 0) {
       for (IndexType i = 0; i < rows; ++i) {
         for (IndexType j = 0; j < cols; ++j) {
-          CHECK(it != it_end);
+          if (it == it_end) {
+            throw std::runtime_error("YAML decode: Unexpected end of data sequence.");
+          }
           M(i, j) = it->as<Scalar>();
           ++it;
         }
@@ -121,21 +126,19 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
   }
 
   template <class Scalar, int A, int C, int D, int E>
-  static bool decode(const Node& node,
-                     Eigen::Matrix<Scalar, A, Eigen::Dynamic, C, D, E>& M) {
-    if(!node.IsMap()) {
-      LOG(ERROR) << "Unable to get parse the matrix because the node is not a map.";
+  static bool decode(const Node& node, Eigen::Matrix<Scalar, A, Eigen::Dynamic, C, D, E>& M) {
+    if (!node.IsMap()) {
+      std::cerr << "Unable to get parse the matrix because the node is not a map.";
       return false;
     }
 
-    typedef typename Eigen::Matrix<Scalar, A, Eigen::Dynamic, C, D, E>::Index
-        IndexType;
+    typedef typename Eigen::Matrix<Scalar, A, Eigen::Dynamic, C, D, E>::Index IndexType;
     IndexType rows = node["rows"].as<IndexType>();
     IndexType cols = node["cols"].as<IndexType>();
 
-    if(rows != A) {
-      LOG(ERROR) << "The matrix is the wrong size (rows, cols). Wanted: (" << A << ","
-          << cols << "), got (" << rows << ", " << cols << ")";
+    if (rows != A) {
+      std::cerr << "The matrix is the wrong size (rows, cols). Wanted: (" << A << "," << cols
+                << "), got (" << rows << ", " << cols << ")";
       return false;
     }
 
@@ -143,12 +146,12 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
 
     size_t expected_size = M.rows() * M.cols();
     if (!node["data"].IsSequence()) {
-      LOG(ERROR) << "The matrix data is not a sequence.";
+      std::cerr << "The matrix data is not a sequence.";
       return false;
     }
-    if(node["data"].size() != expected_size) {
-      LOG(ERROR) << "The data sequence is the wrong size. Wanted: " << expected_size <<
-          ", got: " << node["data"].size();
+    if (node["data"].size() != expected_size) {
+      std::cerr << "The data sequence is the wrong size. Wanted: " << expected_size
+                << ", got: " << node["data"].size();
       return false;
     }
 
@@ -157,7 +160,9 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
     if (rows > 0 && cols > 0) {
       for (IndexType i = 0; i < rows; ++i) {
         for (IndexType j = 0; j < cols; ++j) {
-          CHECK(it != it_end);
+          if (it == it_end) {
+            throw std::runtime_error("YAML decode: Unexpected end of data sequence.");
+          }
           M(i, j) = it->as<Scalar>();
           ++it;
         }
@@ -167,16 +172,15 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
   }
 
   template <class Scalar, int C, int D, int E>
-  static bool decode(
-      const Node& node,
-      Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, C, D, E>& M) {
-    if(!node.IsMap()) {
-      LOG(ERROR) << "Unable to get parse the matrix because the node is not a map.";
+  static bool decode(const Node& node,
+                     Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, C, D, E>& M) {
+    if (!node.IsMap()) {
+      std::cerr << "Unable to get parse the matrix because the node is not a map.";
       return false;
     }
 
-    typedef typename Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, C, D,
-                                   E>::Index IndexType;
+    typedef
+        typename Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, C, D, E>::Index IndexType;
     IndexType rows = node["rows"].as<IndexType>();
     IndexType cols = node["cols"].as<IndexType>();
 
@@ -184,12 +188,12 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
 
     size_t expected_size = M.rows() * M.cols();
     if (!node["data"].IsSequence()) {
-      LOG(ERROR) << "The matrix data is not a sequence.";
+      std::cerr << "The matrix data is not a sequence.";
       return false;
     }
-    if(node["data"].size() != expected_size) {
-      LOG(ERROR) << "The data sequence is the wrong size. Wanted: " << expected_size <<
-          ", got: " << node["data"].size();
+    if (node["data"].size() != expected_size) {
+      std::cerr << "The data sequence is the wrong size. Wanted: " << expected_size
+                << ", got: " << node["data"].size();
       return false;
     }
     YAML::const_iterator it = node["data"].begin();
@@ -197,7 +201,9 @@ struct convert<Eigen::Matrix<Scalar_, A_, B_, C_, D_, E_> > {
     if (rows > 0 && cols > 0) {
       for (IndexType i = 0; i < rows; ++i) {
         for (IndexType j = 0; j < cols; ++j) {
-          CHECK(it != it_end);
+          if (it == it_end) {
+            throw std::runtime_error("YAML decode: Unexpected end of data sequence.");
+          }
           M(i, j) = it->as<Scalar>();
           ++it;
         }

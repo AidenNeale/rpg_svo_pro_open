@@ -1,16 +1,15 @@
 #pragma once
 
-#include <thread>
-
-#include <ros/ros.h>
-#include <std_msgs/String.h>    // user-input
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/Imu.h>
-
-
-#include <svo/common/types.h>
 #include <svo/common/camera_fwd.h>
 #include <svo/common/transformation.h>
+#include <svo/common/types.h>
+
+#include <image_transport/image_transport.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/imu.hpp>
+#include <std_msgs/msg/string.hpp>  // user-input
+#include <thread>
 
 namespace svo {
 
@@ -22,25 +21,20 @@ class BackendInterface;
 class CeresBackendInterface;
 class CeresBackendPublisher;
 
-enum class PipelineType {
-  kMono,
-  kStereo,
-  kArray
-};
+enum class PipelineType { kMono, kStereo, kArray };
 
 /// SVO Interface
-class SvoInterface
-{
-public:
-
+class SvoInterface {
+ public:
   // ROS subscription and publishing.
-  ros::NodeHandle nh_;
-  ros::NodeHandle pnh_;
+  std::shared_ptr<rclcpp::Node> nh_;
   PipelineType pipeline_type_;
-  ros::Subscriber sub_remote_key_;
+  std::shared_ptr<rclcpp::Subscription<std_msgs::msg::String>> sub_remote_key_;
+  std::shared_ptr<rclcpp::Subscription<sensor_msgs::msg::Imu>> sub_imu_;
   std::string remote_input_;
   std::unique_ptr<std::thread> imu_thread_;
   std::unique_ptr<std::thread> image_thread_;
+  std::shared_ptr<image_transport::Subscriber> it_sub_;
 
   // SVO modules.
   std::shared_ptr<FrameHandlerBase> svo_;
@@ -60,31 +54,23 @@ public:
   bool idle_ = false;
   bool automatic_reinitialization_ = false;
 
-  SvoInterface(const PipelineType& pipeline_type,
-          const ros::NodeHandle& nh,
-          const ros::NodeHandle& private_nh);
+  SvoInterface(const PipelineType& pipeline_type, std::shared_ptr<rclcpp::Node> nh);
 
   virtual ~SvoInterface();
 
   // Processing
-  void processImageBundle(
-      const std::vector<cv::Mat>& images,
-      int64_t timestamp_nanoseconds);
+  void processImageBundle(const std::vector<cv::Mat>& images, int64_t timestamp_nanoseconds);
 
   bool setImuPrior(const int64_t timestamp_nanoseconds);
 
-  void publishResults(
-      const std::vector<cv::Mat>& images,
-      const int64_t timestamp_nanoseconds);
+  void publishResults(const std::vector<cv::Mat>& images, const int64_t timestamp_nanoseconds);
 
   // Subscription and callbacks
-  void monoCallback(const sensor_msgs::ImageConstPtr& msg);
-  void stereoCallback(
-      const sensor_msgs::ImageConstPtr& msg0,
-      const sensor_msgs::ImageConstPtr& msg1);
-  void imuCallback(const sensor_msgs::ImuConstPtr& imu_msg);
-  void inputKeyCallback(const std_msgs::StringConstPtr& key_input);
-
+  void monoCallback(const sensor_msgs::msg::Image::ConstSharedPtr& msg);
+  void stereoCallback(const sensor_msgs::msg::Image::ConstSharedPtr& msg0,
+                      const sensor_msgs::msg::Image::ConstSharedPtr& msg1);
+  void imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& imu_msg);
+  void inputKeyCallback(const std_msgs::msg::String::ConstSharedPtr& key_input);
 
   // These functions are called before and after monoCallback or stereoCallback.
   // a derived class can implement some additional logic here.
@@ -100,4 +86,4 @@ public:
   void stereoLoop();
 };
 
-} // namespace svo
+}  // namespace svo

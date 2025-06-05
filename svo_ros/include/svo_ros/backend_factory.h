@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 
 namespace svo {
 
@@ -10,7 +10,7 @@ class BackendInterface;
 
 namespace backend_factory {
 
-std::shared_ptr<BackendInterface> makeBackend(const ros::NodeHandle& pnh);
+std::shared_ptr<BackendInterface> makeBackend(std::shared_ptr<rclcpp::Node> pnh);
 
-} // namespace vin_factory
-} // namespace svo
+}  // namespace backend_factory
+}  // namespace svo

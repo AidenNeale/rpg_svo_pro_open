@@ -1,18 +1,22 @@
+cmake_minimum_required(VERSION 3.8)
 project(rpg_common)
-cmake_minimum_required(VERSION 2.8.3)
 
-find_package(catkin_simple REQUIRED)
-catkin_simple(ALL_DEPS_REQUIRED)
-find_package(OpenCV REQUIRED)
+find_package(ament_cmake REQUIRED)
 
-add_definitions(-std=c++11)
+file(GLOB_RECURSE HEADERS "include/*")
 
-FILE(GLOB_RECURSE HEADERS "include/*")
+add_library(${PROJECT_NAME} INTERFACE)
+target_include_directories(${PROJECT_NAME} INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+install(TARGETS ${PROJECT_NAME}
+  EXPORT export_${PROJECT_NAME}
+)
 
-list(APPEND SOURCES src/fs.cpp)
+install(DIRECTORY include/ DESTINATION include)
 
-cs_add_library(${PROJECT_NAME} ${HEADERS} ${SOURCES})
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES})
+ament_export_include_directories(include)
+ament_export_targets(export_${PROJECT_NAME})
 
-cs_install()
-cs_export()
+ament_package()

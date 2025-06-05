@@ -1,29 +1,28 @@
 #include "vikit/cameras/equidistant_fisheye_projection.h"
 
-#include <glog/logging.h>
-
 namespace vk {
 namespace cameras {
 
 // May later be generalized to any distortion once a use case exists.
-EquidistantFisheyeProjection::EquidistantFisheyeProjection(
-    double focal_length, Eigen::Vector2d principal_point)
-: focal_length_(focal_length), principal_point_(principal_point)
-{
-  CHECK_NE(focal_length_, 0.);
+EquidistantFisheyeProjection::EquidistantFisheyeProjection(double focal_length,
+                                                           Eigen::Vector2d principal_point)
+    : focal_length_(focal_length), principal_point_(principal_point) {
+  if (focal_length_ == 0.) {
+    throw std::runtime_error("EquidistantFisheyeProjection: focal length is zero");
+  }
 }
 
-bool EquidistantFisheyeProjection::backProject3(
-    const Eigen::Ref<const Eigen::Vector2d>& keypoint,
-    Eigen::Vector3d* out_bearing_vector) const
-{
-  CHECK_NOTNULL(out_bearing_vector);
+bool EquidistantFisheyeProjection::backProject3(const Eigen::Ref<const Eigen::Vector2d>& keypoint,
+                                                Eigen::Vector3d* out_bearing_vector) const {
+  if (!out_bearing_vector) {
+    throw std::runtime_error(
+        "EquidistantFisheyeProjection::backProject3: out_bearing_vector is null");
+  }
 
   constexpr double kEpsilon = 1e-10;
   Eigen::Vector2d p_c = keypoint - principal_point_;
   const double r = p_c.norm();
-  if(fabs(r) < kEpsilon)
-  {
+  if (fabs(r) < kEpsilon) {
     *out_bearing_vector << 0.0, 0.0, 1.0;
     return true;
   }
@@ -36,12 +35,12 @@ bool EquidistantFisheyeProjection::backProject3(
   return true;
 }
 
-void EquidistantFisheyeProjection::project3(
-    const Eigen::Ref<const Eigen::Vector3d>& point_3d,
-    Eigen::Vector2d* out_keypoint,
-    Eigen::Matrix<double, 2, 3>* out_jacobian_point) const
-{
-  CHECK_NOTNULL(out_keypoint);
+void EquidistantFisheyeProjection::project3(const Eigen::Ref<const Eigen::Vector3d>& point_3d,
+                                            Eigen::Vector2d* out_keypoint,
+                                            Eigen::Matrix<double, 2, 3>* out_jacobian_point) const {
+  if (!out_keypoint) {
+    throw std::runtime_error("EquidistantFisheyeProjection::project3: out_keypoint is null");
+  }
 
   const double kEpsilon = 1e-10;
 
@@ -53,66 +52,61 @@ void EquidistantFisheyeProjection::project3(
   const double y2 = y * y;
   const double xy_norm2 = x2 + y2;
   const double xy_norm = std::sqrt(xy_norm2);
-  const double xyz_norm2 = xy_norm2 + std::pow(z,2);
+  const double xyz_norm2 = xy_norm2 + std::pow(z, 2);
   const double xyz_norm = std::sqrt(xyz_norm2);
 
-  CHECK_GE(xyz_norm, kEpsilon);
+  if (xyz_norm < kEpsilon) {
+    throw std::runtime_error(
+        "EquidistantFisheyeProjection::project3: xyz_norm is too small. Currently xyz_norm = " +
+        std::to_string(xyz_norm) + " but should be >= " + std::to_string(kEpsilon));
+  }
 
   double theta;
-  if(fabs(xy_norm) < kEpsilon)
-  {
+  if (fabs(xy_norm) < kEpsilon) {
     theta = 0.;
     (*out_keypoint) = principal_point_;
-  }
-  else
-  {
+  } else {
     theta = std::acos(z / xyz_norm);
     const double r = focal_length_ * theta;
 
     (*out_keypoint) = principal_point_ + r / xy_norm * point_3d.head<2>();
   }
 
-  if(out_jacobian_point)
-  {
+  if (out_jacobian_point) {
     const double R = xyz_norm;
     const double rho = xy_norm;
     const double f = focal_length_;
     const double rho2 = xy_norm2;
     const double R2 = xyz_norm2;
 
-    const double duf_dx = f / rho * (theta - x2*theta/rho2 + z*x2/(rho*R2));
-    const double duf_dy = f*x*y/rho2 * (z/R2 - theta/rho);
-    const double duf_dz = -x*f/rho2 * (1-z*z/R2);
+    const double duf_dx = f / rho * (theta - x2 * theta / rho2 + z * x2 / (rho * R2));
+    const double duf_dy = f * x * y / rho2 * (z / R2 - theta / rho);
+    const double duf_dz = -x * f / rho2 * (1 - z * z / R2);
 
     const double dvf_dx = duf_dy;
-    const double dvf_dy = f / rho * (theta - y2*theta/rho2 + z*y2/(rho*R2));
-    const double dvf_dz = -y*f/rho2 * (1-z*z/R2);
+    const double dvf_dy = f / rho * (theta - y2 * theta / rho2 + z * y2 / (rho * R2));
+    const double dvf_dz = -y * f / rho2 * (1 - z * z / R2);
 
-    (*out_jacobian_point) << duf_dx, duf_dy, duf_dz,
-                             dvf_dx, dvf_dy, dvf_dz;
+    (*out_jacobian_point) << duf_dx, duf_dy, duf_dz, dvf_dx, dvf_dy, dvf_dz;
   }
 }
 
-double EquidistantFisheyeProjection::errorMultiplier() const
-{
+double EquidistantFisheyeProjection::errorMultiplier() const {
   // TODO(tcies) What is this?
   return 1.;
 }
 
-double EquidistantFisheyeProjection::getAngleError(double img_err) const
-{
+double EquidistantFisheyeProjection::getAngleError(double img_err) const {
   return img_err / focal_length_;
 }
 
-void EquidistantFisheyeProjection::print(std::ostream& out) const
-{
+void EquidistantFisheyeProjection::print(std::ostream& out) const {
   out << "  Projection = Equidistant Fisheye" << std::endl;
   out << "  Focal length = (" << focal_length_ << std::endl;
   out << "  Principal point = " << principal_point_.transpose() << std::endl;
 }
 
-Eigen::VectorXd EquidistantFisheyeProjection::getIntrinsicParameters() const
-{
+Eigen::VectorXd EquidistantFisheyeProjection::getIntrinsicParameters() const {
   Eigen::VectorXd intrinsics(3);
   intrinsics(0) = focal_length_;
   intrinsics(1) = principal_point_(0);
@@ -120,8 +114,7 @@ Eigen::VectorXd EquidistantFisheyeProjection::getIntrinsicParameters() const
   return intrinsics;
 }
 
-Eigen::VectorXd EquidistantFisheyeProjection::getDistortionParameters() const
-{
+Eigen::VectorXd EquidistantFisheyeProjection::getDistortionParameters() const {
   Eigen::VectorXd distortion;
   return distortion;
 }

@@ -1,10 +1,17 @@
+cmake_minimum_required (VERSION 3.8)
 project(vikit_cameras)
-cmake_minimum_required (VERSION 2.8.3)
 
-find_package(catkin_simple REQUIRED)
-catkin_simple(ALL_DEPS_REQUIRED)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_BUILD_TYPE Release)
 
-include(SvoSetup)
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_gtest REQUIRED)
+find_package(yaml-cpp REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(GTest REQUIRED)
+find_package(OpenCV REQUIRED)
+
+find_package(vikit_common REQUIRED)
 
 set(HEADERS
   include/vikit/cameras.h
@@ -40,19 +47,30 @@ set(SOURCES
   src/ncamera_yaml_serialization.cpp
   )
 
-cs_add_library(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-target_link_libraries(${PROJECT_NAME} yaml-cpp)
-
-################################################################################
-# Tests
-
-catkin_add_gtest(${PROJECT_NAME}_tests
-  test/test_cameras
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+target_include_directories(${PROJECT_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
+ament_target_dependencies(${PROJECT_NAME} vikit_common)
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES} yaml-cpp Eigen3::Eigen)
+
+# Unit tests
+ament_add_gtest(${PROJECT_NAME}_tests test/test_cameras.cpp)
+ament_target_dependencies(${PROJECT_NAME} vikit_common)
 target_link_libraries(${PROJECT_NAME}_tests ${PROJECT_NAME})
 
-################################################################################
-# Install
+# Install library and headers
+install(TARGETS ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+install(DIRECTORY include/
+  DESTINATION include/
+)
 
-cs_install()
-cs_export()
+ament_export_libraries(${PROJECT_NAME})
+ament_export_include_directories(include)
+ament_package()

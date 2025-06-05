@@ -5,7 +5,7 @@
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright notice,
  *     this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright notice,
@@ -48,20 +48,16 @@ namespace ceres_backend {
 // Generalization of the addition operation,
 //        x_plus_delta = Plus(x, delta)
 //        with the condition that Plus(x, 0) = x.
-bool HomogeneousPointLocalParameterization::Plus(const double* x,
-                                                 const double* delta,
-                                                 double* x_plus_delta) const
-{
+bool HomogeneousPointLocalParameterization::Plus(const double* x, const double* delta,
+                                                 double* x_plus_delta) const {
   return plus(x, delta, x_plus_delta);
 }
 
 // Generalization of the addition operation,
 //        x_plus_delta = Plus(x, delta)
 //        with the condition that Plus(x, 0) = x.
-bool HomogeneousPointLocalParameterization::plus(const double* x,
-                                                 const double* delta,
-                                                 double* x_plus_delta)
-{
+bool HomogeneousPointLocalParameterization::plus(const double* x, const double* delta,
+                                                 double* x_plus_delta) {
   Eigen::Map<const Eigen::Vector3d> delta_(delta);
   Eigen::Map<const Eigen::Vector4d> x_(x);
   Eigen::Map<Eigen::Vector4d> x_plus_delta_(x_plus_delta);
@@ -73,48 +69,39 @@ bool HomogeneousPointLocalParameterization::plus(const double* x,
 }
 
 // Computes the minimal difference between a variable x and a perturbed variable x_plus_delta.
-bool HomogeneousPointLocalParameterization::Minus(const double* x,
-                                                  const double* x_plus_delta,
-                                                  double* delta) const
-{
+bool HomogeneousPointLocalParameterization::Minus(const double* x, const double* x_plus_delta,
+                                                  double* delta) const {
   return minus(x, x_plus_delta, delta);
 }
 
-bool HomogeneousPointLocalParameterization::ComputeLiftJacobian(
-    const double* x, double* jacobian) const
-{
+bool HomogeneousPointLocalParameterization::MinusJacobian(const double* x, double* jacobian) const {
   return liftJacobian(x, jacobian);
 }
 
 // Computes the minimal difference between a variable x and a perturbed variable x_plus_delta.
-bool HomogeneousPointLocalParameterization::minus(const double* x,
-                                                  const double* x_plus_delta,
-                                                  double* delta)
-{
+bool HomogeneousPointLocalParameterization::minus(const double* x, const double* x_plus_delta,
+                                                  double* delta) {
   Eigen::Map<Eigen::Vector3d> delta_(delta);
   Eigen::Map<const Eigen::Vector4d> x_(x);
   Eigen::Map<const Eigen::Vector4d> x_plus_delta_(x_plus_delta);
 
   // Euclidean style
-  DEBUG_CHECK(fabs((x_plus_delta_-x_)[3])<1e-12)
-      << "comparing homogeneous points with different scale "
-      << x_plus_delta_[3] << " vs. " << x_[3];
+  if (!(fabs((x_plus_delta_ - x_)[3]) < 1e-12)) {
+    throw std::runtime_error("Comparing homogeneous points with different scale" +
+                             std::to_string(x_plus_delta_[3]) + " vs. " + std::to_string(x_[3]));
+  }
   delta_ = (x_plus_delta_ - x_).head<3>();
 
   return true;
 }
 
 // The jacobian of Plus(x, delta) w.r.t delta at delta = 0.
-bool HomogeneousPointLocalParameterization::ComputeJacobian(
-    const double* x, double* jacobian) const
-{
+bool HomogeneousPointLocalParameterization::PlusJacobian(const double* x, double* jacobian) const {
   return plusJacobian(x, jacobian);
 }
 
 // The jacobian of Plus(x, delta) w.r.t delta at delta = 0.
-bool HomogeneousPointLocalParameterization::plusJacobian(const double*,
-                                                         double* jacobian)
-{
+bool HomogeneousPointLocalParameterization::plusJacobian(const double*, double* jacobian) {
   Eigen::Map<Eigen::Matrix<double, 4, 3, Eigen::RowMajor> > Jp(jacobian);
 
   // Euclidean-style
@@ -125,9 +112,7 @@ bool HomogeneousPointLocalParameterization::plusJacobian(const double*,
 }
 
 // Computes the Jacobian from minimal space to naively overparameterised space as used by ceres.
-bool HomogeneousPointLocalParameterization::liftJacobian(const double*,
-                                                         double* jacobian)
-{
+bool HomogeneousPointLocalParameterization::liftJacobian(const double*, double* jacobian) {
   Eigen::Map<Eigen::Matrix<double, 3, 4, Eigen::RowMajor> > Jp(jacobian);
 
   // Euclidean-style

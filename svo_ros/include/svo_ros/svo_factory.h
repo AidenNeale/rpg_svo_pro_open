@@ -1,8 +1,9 @@
 #pragma once
 
-#include <memory>
-#include <ros/ros.h>
 #include <svo/common/camera_fwd.h>
+
+#include <memory>
+#include <rclcpp/rclcpp.hpp>
 
 namespace svo {
 
@@ -18,40 +19,33 @@ class FrameHandlerDenseMono;
 namespace factory {
 
 /// Get IMU Handler.
-std::shared_ptr<ImuHandler> getImuHandler(
-    const ros::NodeHandle& pnh);
+std::shared_ptr<ImuHandler> getImuHandler(std::shared_ptr<rclcpp::Node> pnh);
 
 #ifdef SVO_LOOP_CLOSING
 /// Create loop closing module
-std::shared_ptr<LoopClosing> getLoopClosingModule(
-    const ros::NodeHandle& pnh,
-    const CameraBundlePtr& cam=nullptr);
+std::shared_ptr<LoopClosing> getLoopClosingModule(std::shared_ptr<rclcpp::Node> pnh,
+                                                  const CameraBundlePtr& cam = nullptr);
 #endif
 
 #ifdef SVO_GLOBAL_MAP
-std::shared_ptr<GlobalMap> getGlobalMap(
-    const ros::NodeHandle& pnh,
-    const CameraBundlePtr& ncams = nullptr);
+std::shared_ptr<GlobalMap> getGlobalMap(std::shared_ptr<rclcpp::Node> pnh,
+                                        const CameraBundlePtr& ncams = nullptr);
 #endif
 
 /// Factory for Mono-SVO.
-std::shared_ptr<FrameHandlerMono> makeMono(
-    const ros::NodeHandle& pnh,
-    const CameraBundlePtr& cam = nullptr);
+std::shared_ptr<FrameHandlerMono> makeMono(std::shared_ptr<rclcpp::Node> pnh,
+                                           const CameraBundlePtr& cam = nullptr);
 
 /// Factory for Stereo-SVO.
-std::shared_ptr<FrameHandlerStereo> makeStereo(
-    const ros::NodeHandle& pnh,
-    const CameraBundlePtr& cam = nullptr);
+std::shared_ptr<FrameHandlerStereo> makeStereo(std::shared_ptr<rclcpp::Node> pnh,
+                                               const CameraBundlePtr& cam = nullptr);
 
 /// Factory for Camera-Array-SVO.
-std::shared_ptr<FrameHandlerArray> makeArray(
-    const ros::NodeHandle& pnh,
-    const CameraBundlePtr& cam = nullptr);
+std::shared_ptr<FrameHandlerArray> makeArray(std::shared_ptr<rclcpp::Node> pnh,
+                                             const CameraBundlePtr& cam = nullptr);
 
 /// Factory for Camera-Array-SVO
-std::shared_ptr<FrameHandlerDenseMono> makeDenseMono(
-    const ros::NodeHandle& pnh);
+std::shared_ptr<FrameHandlerDenseMono> makeDenseMono(std::shared_ptr<rclcpp::Node> pnh);
 
-} // namespace factory
-} // namespace mono
+}  // namespace factory
+}  // namespace svo
