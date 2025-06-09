@@ -74,7 +74,16 @@ bool HomogeneousPointLocalParameterization::Minus(const double* x, const double*
   return minus(x, x_plus_delta, delta);
 }
 
-bool HomogeneousPointLocalParameterization::MinusJacobian(const double* x, double* jacobian) const {
+bool HomogeneousPointLocalParameterization::MinusJacobian(const double* /*x*/,
+                                                          double* jacobian) const {
+  Eigen::Map<Eigen::Matrix<double, 3, 4, Eigen::RowMajor>> Jm(jacobian);
+  Jm.setZero();
+  Jm.topLeftCorner<3, 3>() = Eigen::Matrix3d::Identity();
+  return true;
+}
+
+bool HomogeneousPointLocalParameterization::ComputeLiftJacobian(const double* x,
+                                                                double* jacobian) const {
   return liftJacobian(x, jacobian);
 }
 
@@ -86,10 +95,9 @@ bool HomogeneousPointLocalParameterization::minus(const double* x, const double*
   Eigen::Map<const Eigen::Vector4d> x_plus_delta_(x_plus_delta);
 
   // Euclidean style
-  if (!(fabs((x_plus_delta_ - x_)[3]) < 1e-12)) {
-    throw std::runtime_error("Comparing homogeneous points with different scale" +
-                             std::to_string(x_plus_delta_[3]) + " vs. " + std::to_string(x_[3]));
-  }
+  CHECK(fabs((x_plus_delta_ - x_)[3]) < 1e-12)
+      << "comparing homogeneous points with different scale " << x_plus_delta_[3] << " vs. "
+      << x_[3];
   delta_ = (x_plus_delta_ - x_).head<3>();
 
   return true;
@@ -102,7 +110,7 @@ bool HomogeneousPointLocalParameterization::PlusJacobian(const double* x, double
 
 // The jacobian of Plus(x, delta) w.r.t delta at delta = 0.
 bool HomogeneousPointLocalParameterization::plusJacobian(const double*, double* jacobian) {
-  Eigen::Map<Eigen::Matrix<double, 4, 3, Eigen::RowMajor> > Jp(jacobian);
+  Eigen::Map<Eigen::Matrix<double, 4, 3, Eigen::RowMajor>> Jp(jacobian);
 
   // Euclidean-style
   Jp.setZero();
@@ -113,7 +121,7 @@ bool HomogeneousPointLocalParameterization::plusJacobian(const double*, double* 
 
 // Computes the Jacobian from minimal space to naively overparameterised space as used by ceres.
 bool HomogeneousPointLocalParameterization::liftJacobian(const double*, double* jacobian) {
-  Eigen::Map<Eigen::Matrix<double, 3, 4, Eigen::RowMajor> > Jp(jacobian);
+  Eigen::Map<Eigen::Matrix<double, 3, 4, Eigen::RowMajor>> Jp(jacobian);
 
   // Euclidean-style
   Jp.setZero();

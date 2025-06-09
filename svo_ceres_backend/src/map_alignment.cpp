@@ -64,7 +64,7 @@ bool MapAlignmentSE3::getTransformation(Transformation& T_old_new) {
 
   //! @todo it seems to work fine with two points in general!
   if (num_points_ / (double)num_points_old < 0.5 && num_points_ < 8) {
-    std::cout << "Not Enough 3D inliers. Not Closing the loop.";
+    VLOG(40) << "Not Enough 3D inliers. Not Closing the loop.";
     return false;
   }
 
@@ -115,7 +115,7 @@ bool MapAlignmentSE3::getTransformation(Transformation& T_old_new) {
       num_points_new++;
     }
   }
-  std::cout << "Average Residual Error " << residual / num_points_;
+  VLOG(40) << "Average Residual Error " << residual / num_points_;
   mean_old_no_outliers_newit /= num_points_new;
   mean_new_no_outliers_newit /= num_points_new;
   mean_old = mean_old_no_outliers_newit;
@@ -154,7 +154,7 @@ bool MapAlignmentSE3::getTransformation(Transformation& T_old_new) {
                           .norm();
     residual += curr_res;
   }
-  std::cout << "Average Residual " << residual / num_points_;
+  VLOG(40) << "Average Residual " << residual / num_points_;
 
   if (residual / num_points_ > 0.4) {
     return false;
@@ -196,7 +196,7 @@ bool MapAlignmentSE3::getTransformation(Transformation& T_old_new) {
 bool MapAlignmentSE3::getTransformRansac(Transformation& T_old_new, const int& min_num_3d,
                                          int& n_ransac_inliers, bool& relax_thresh) {
   if (num_points_ransac_ < min_num_3d) {
-    std::cout << "Not enough points for ransac";
+    VLOG(40) << "Not enough points for ransac";
     return false;
   }
   /* create point cloud adapter */
@@ -218,14 +218,14 @@ bool MapAlignmentSE3::getTransformRansac(Transformation& T_old_new, const int& m
 
   ransac.computeModel(0);
   size_t num_inliers = ransac.inliers_.size();
-  std::cout << "The number of inliers is: " << num_inliers;
+  VLOG(40) << "The number of inliers is: " << num_inliers;
   ransac_inliers_.conservativeResize(points_vec_new_.size());
   ransac_inliers_ = Eigen::VectorXd::Zero(points_vec_new_.size());
   for (size_t i = 0; i < ransac.inliers_.size(); i++) {
     ransac_inliers_(ransac.inliers_[i]) = 1;
   }
-  std::cout << "Ransac inlier vector size " << ransac_inliers_.rows() << std::endl;
-  std::cout << "Ransac Needed " << ransac.iterations_ << " iterations." << std::endl;
+  VLOG(40) << "Ransac inlier vector size " << ransac_inliers_.rows() << std::endl;
+  VLOG(40) << "Ransac Needed " << ransac.iterations_ << " iterations." << std::endl;
   opengv::transformation_t transform = ransac.model_coefficients_;
   Eigen::Matrix<FloatType, 3, 3> R = transform.block<3, 3>(0, 0);
   T_old_new.getRotation() = Transformation::Rotation(R);
@@ -237,11 +237,11 @@ bool MapAlignmentSE3::getTransformRansac(Transformation& T_old_new, const int& m
             transform.col(3))
                .norm();
   }
-  std::cout << "Average Residual after ransac " << res / num_inliers;
+  VLOG(40) << "Average Residual after ransac " << res / num_inliers;
 
   if ((double)num_inliers / num_points_ransac_ * 100 < ransac3d_inlier_percent_ ||
       num_inliers < static_cast<size_t>(min_points_thresh)) {
-    std::cout << "Not enough inliers after ransac. Not closing Loop";
+    VLOG(40) << "Not enough inliers after ransac. Not closing Loop";
     return false;
   }
   n_ransac_inliers = num_inliers;
@@ -315,8 +315,8 @@ Transformation MapAlignmentSE3::getTransformationCombined(Transformation& T_w_lc
    * location and orientation (still in world frame). So, T_w_cf_new (new cf) = T_new_old * T_w_cf_
    */
   T_new_old = T_w_new * T_w_cf.inverse();
-  std::cout << "T new old" << std::endl;
-  std::cout << T_new_old << std::endl;
+  VLOG(40) << "T new old";
+  VLOG(40) << T_new_old;
   return T_new_old;
 }
 

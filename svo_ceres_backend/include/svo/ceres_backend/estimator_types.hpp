@@ -33,6 +33,8 @@
 
 #pragma once
 
+#include <glog/logging.h>
+
 #include <map>
 #include <vector>
 
@@ -166,44 +168,30 @@ class BackendId {
   }
 
   int32_t bundleId() const {
-    if (type() == IdType::Landmark) {
-      throw std::runtime_error("Landmarks do not have a bundle ID.");
-    }
+    CHECK(type() != IdType::Landmark) << "Landmarks do not have a bundle ID.";
     // The bundle ID is byte 2 -> 6 in id.
     return static_cast<int32_t>((id_ >> 16) & 0xFFFFFFFF);
   }
 
   uint32_t trackId() const {
-    if (type() != IdType::Landmark) {
-      throw std::runtime_error("Only landmarks have a track ID.");
-    }
+    CHECK(type() == IdType::Landmark);
     // In case of a landmark, the last 4 bytes are the track ID.
     return static_cast<uint32_t>(id_ & 0xFFFFFFFF);
   }
 
   uint16_t nFrameHandle() const {
-    if (type() != IdType::NFrame || type() != IdType::ImuStates || type() != IdType::Extrinsics) {
-      throw std::runtime_error("Only NFrame, IMU states and Extrinsics have a handle.");
-    }
+    CHECK(type() == IdType::NFrame || type() == IdType::ImuStates || type() == IdType::Extrinsics);
     // In case of an NFrame, the last 2 bytes are the handle.
     return static_cast<uint16_t>(id_ & 0xFFFF);
   }
 
   uint8_t cameraIndex() const {
-    if (type() != IdType::Extrinsics) {
-      throw std::runtime_error("Only Extrinsics have a camera index.");
-    }
+    CHECK(type() == IdType::Extrinsics);
     // The second byte is the camara index.
     return static_cast<uint8_t>((id_ >> 48) & 0x00000FF);
   }
 
   bool valid() const { return id_ != 0; }
-
-  std::string toString() const {
-    std::ostringstream oss;
-    oss << std::hex << id_ << std::dec;
-    return oss.str();
-  }
 
  private:
   uint64_t id_{0};
@@ -216,9 +204,7 @@ inline BackendId createLandmarkId(int track_id) {
 }
 
 inline BackendId createNFrameId(int32_t bundle_id) {
-  if (bundle_id < 0) {
-    throw std::runtime_error("Bundle ID must be non-negative.");
-  }
+  CHECK_GE(bundle_id, 0);
   return BackendId((static_cast<uint64_t>(bundle_id) << 16) |
                    (static_cast<uint64_t>(IdType::NFrame) << 56));
 }
@@ -235,15 +221,9 @@ inline BackendId createImuStateId(int32_t bundle_id) {
 }
 
 inline BackendId changeIdType(BackendId id, IdType type, size_t cam_index = 0) {
-  if (id.type() == IdType::Landmark) {
-    throw std::runtime_error("Cannot change type of a landmark ID.");
-  }
-  if (type == IdType::Landmark) {
-    throw std::runtime_error("Cannot change to Landmark type.");
-  }
-  if (cam_index != 0 && type != IdType::Extrinsics) {
-    throw std::runtime_error("Changing to non-extrinsics type with camera index is not allowed.");
-  }
+  CHECK(id.type() != IdType::Landmark);
+  CHECK(type != IdType::Landmark);
+  CHECK(cam_index == 0 || type == IdType::Extrinsics);
   // Last 6 bytes remain the same.
   return BackendId((id.asInteger() & 0xFFFFFFFFFFFF) | (static_cast<uint64_t>(cam_index) << 48) |
                    (static_cast<uint64_t>(type) << 56));

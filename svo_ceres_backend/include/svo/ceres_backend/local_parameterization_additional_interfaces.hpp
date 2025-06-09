@@ -63,7 +63,7 @@ class LocalParamizationAdditionalInterfaces {
   /// @param[in] x Variable.
   /// @param[out] jacobian the Jacobian (dimension minDim x dim).
   /// \return True on success.
-  virtual bool MinusJacobian(const double* x, double* jacobian) const = 0;
+  virtual bool ComputeLiftJacobian(const double* x, double* jacobian) const = 0;
 
   /// \brief Verifies the correctness of an inplementation by means of numeric Jacobians.
   /// @param[in] x_raw Linearisation point of the variable.

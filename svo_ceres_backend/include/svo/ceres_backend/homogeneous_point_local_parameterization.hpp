@@ -81,14 +81,16 @@ class HomogeneousPointLocalParameterization : public ceres::Manifold,
   /// \brief The jacobian of Plus(x, delta) w.r.t delta at delta = 0.
   /// @param[in] x Variable.
   /// @param[out] jacobian The Jacobian.
-  // virtual bool ComputeJacobian(const double* x, double* jacobian) const;
+  virtual bool PlusJacobian(const double* x, double* jacobian) const;
+
+  virtual bool MinusJacobian(const double* x, double* jacobian) const;
 
   /// \brief Computes the Jacobian from minimal space to naively
   ///        overparameterised space as used by ceres.
   /// @param[in] x Variable.
   /// @param[out] jacobian the Jacobian (dimension minDim x dim).
   /// \return True on success.
-  // virtual bool ComputeLiftJacobian(const double* x, double* jacobian) const;
+  virtual bool ComputeLiftJacobian(const double* x, double* jacobian) const;
 
   // provide these as static for easy use elsewhere:
 
@@ -125,9 +127,6 @@ class HomogeneousPointLocalParameterization : public ceres::Manifold,
 
   /// \brief The parameter block local dimension.
   virtual int TangentSize() const { return 3; }
-
-  virtual bool PlusJacobian(const double* x, double* jacobian) const override;
-  virtual bool MinusJacobian(const double* x, double* jacobian) const override;
 };
 
 }  // namespace ceres_backend

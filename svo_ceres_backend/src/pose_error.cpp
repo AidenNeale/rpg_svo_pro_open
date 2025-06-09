@@ -56,12 +56,8 @@ PoseError::PoseError(const Transformation& measurement,
 // Construct with measurement and variance.
 PoseError::PoseError(const Transformation& measurement, double translation_variance,
                      double rotation_variance) {
-  if (translation_variance <= 0.0) {
-    throw std::invalid_argument("Translation variance must be positive.");
-  }
-  if (rotation_variance <= 0.0) {
-    throw std::invalid_argument("Rotation variance must be positive.");
-  }
+  CHECK_GT(translation_variance, 0.0);
+  CHECK_GT(rotation_variance, 0.0);
   setMeasurement(measurement);
 
   information_t information;

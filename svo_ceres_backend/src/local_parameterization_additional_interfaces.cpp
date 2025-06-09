@@ -95,7 +95,7 @@ bool LocalParamizationAdditionalInterfaces::verify(const double* x_raw,
   Eigen::Matrix<double, -1, -1, Eigen::RowMajor> J_lift(casted->TangentSize(),
                                                         casted->AmbientSize());
   casted->PlusJacobian(x_raw, J_plus.data());
-  MinusJacobian(x_raw, J_lift.data());
+  ComputeLiftJacobian(x_raw, J_lift.data());
   Eigen::MatrixXd identity(casted->TangentSize(), casted->TangentSize());
   identity.setIdentity();
   if (((J_lift * J_plus) - identity).norm() > 1.0e-6) {

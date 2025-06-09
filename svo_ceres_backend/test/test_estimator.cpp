@@ -114,7 +114,7 @@ TEST(okvisTestSuite, Estimator) {
 
   // different cases of camera extrinsics;
   for (size_t extrinsics_case = 0; extrinsics_case < 4; ++extrinsics_case) {
-    std::cout << "case " << extrinsics_case % 2 << ", " << extrinsics_case / 2;
+    LOG(INFO) << "case " << extrinsics_case % 2 << ", " << extrinsics_case / 2;
 
     // -------------------------------------------------------------------------
     // Estimator setup.
@@ -155,9 +155,7 @@ TEST(okvisTestSuite, Estimator) {
         svo::PointPtr point =
             std::make_shared<svo::Point>(track_ids.back(), landmark_positions.back());
         bool success = estimator.addLandmark(point);
-        if (!success) {
-          throw std::runtime_error("Could not add landmark.");
-        }
+        CHECK(success) << "Could not add landmark.";
       }
     }
 
@@ -191,14 +189,10 @@ TEST(okvisTestSuite, Estimator) {
       if (k % 3 == 0) {
         estimator.setKeyframe(svo::createNFrameId(nframe->getBundleId()), true);
       }
-      if (!success) {
-        throw std::runtime_error("addStates() failed!");
-      }
+      CHECK(success) << "addStates() failed!";
 
       success = estimator.get_T_WS(nframe->getBundleId(), T_WS_est);
-      if (!success) {
-        throw std::runtime_error("get_T_WS failed!");
-      }
+      CHECK(success) << "get_T_WS failed!";
 
       // now let's add also landmark observations
       for (size_t j = 0; j < landmark_positions.size(); ++j) {
@@ -219,9 +213,7 @@ TEST(okvisTestSuite, Estimator) {
             frame->px_vec_.col(frame->num_features_) = measurement;
             Eigen::Vector3d* bearing = new Eigen::Vector3d();
             success = cam.backProject3(Eigen::Ref<Eigen::Vector2d>(measurement), bearing);
-            if (!success) {
-              throw std::runtime_error("backProject3 failed");
-            }
+            CHECK(success) << "backProject3 failed";
             frame->f_vec_.col(frame->num_features_) = *bearing;
             frame->level_vec_(frame->num_features_) = 1;
             frame->type_vec_[frame->num_features_] = svo::FeatureType::kCorner;
@@ -237,14 +229,14 @@ TEST(okvisTestSuite, Estimator) {
 
       // run the optimization
       estimator.optimize(10, 4, false);
-      std::cout << "Optimization done.";
+      LOG(INFO) << "Optimization done.";
     }
 
-    std::cout << "== TRY MARGINALIZATION ==" << std::endl;
+    LOG(INFO) << "== TRY MARGINALIZATION ==";
     // try out the marginalization strategy
     estimator.applyMarginalizationStrategy(2, 3);
     // run the optimization
-    std::cout << "== LAST OPTIMIZATION ==" << std::endl;
+    LOG(INFO) << "== LAST OPTIMIZATION ==";
     estimator.optimize(10, 4, false);
 
     // get the estimates

@@ -358,9 +358,7 @@ class MarginalizationError : public ceres::CostFunction, public ErrorInterface {
 
     /// \brief Reset the linearisation point. Use with caution.
     void resetLinearizationPoint(std::shared_ptr<ParameterBlock> parameter_block_ptr) {
-      if (dimension != parameter_block_ptr->dimension()) {
-        throw std::runtime_error("Not initialised");
-      }
+      CHECK(dimension == parameter_block_ptr->dimension()) << "not initialised.";
       memcpy(linearization_point.get(), parameter_block_ptr->parameters(),
              dimension * sizeof(double));
     }

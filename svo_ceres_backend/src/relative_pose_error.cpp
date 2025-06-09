@@ -55,12 +55,8 @@ RelativePoseError::RelativePoseError(const Eigen::Matrix<double, 6, 6>& informat
 
 // Construct with measurement and variance.
 RelativePoseError::RelativePoseError(double translationVariance, double rotationVariance) {
-  if (translationVariance <= 0.0) {
-    throw std::invalid_argument("Translation variance must be positive.");
-  }
-  if (rotationVariance <= 0.0) {
-    throw std::invalid_argument("Rotation variance must be positive.");
-  }
+  CHECK_GT(translationVariance, 0.0);
+  CHECK_GT(rotationVariance, 0.0);
   information_t information;
   information.setZero();
   information.topLeftCorner<3, 3>() = Eigen::Matrix3d::Identity() * 1.0 / translationVariance;

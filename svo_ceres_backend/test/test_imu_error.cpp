@@ -205,9 +205,9 @@ TEST(okvisTestSuite, ImuError) {
 
   // let's use our own local quaternion perturbation
   std::cout << "setting local parameterization for pose... " << std::flush;
-  auto* pose_manifold = new ceres_backend::PoseLocalParameterization();
-  problem.SetManifold(poseParameterBlock_0.parameters(), pose_manifold);
-  problem.SetManifold(poseParameterBlock_1.parameters(), pose_manifold);
+  ceres::Manifold* poseLocalParameterization = new ceres_backend::PoseLocalParameterization;
+  problem.SetManifold(poseParameterBlock_0.parameters(), poseLocalParameterization);
+  problem.SetManifold(poseParameterBlock_1.parameters(), poseLocalParameterization);
   std::cout << " [ OK ] " << std::endl;
 
   // create the Imu error term
@@ -271,7 +271,7 @@ TEST(okvisTestSuite, ImuError) {
     Eigen::Matrix<double, 15, 1> residuals_m;
     dp_0.setZero();
     dp_0[i] = dx;
-    pose_manifold->Plus(parameters[0], dp_0.data(), parameters[0]);
+    poseLocalParameterization->Plus(parameters[0], dp_0.data(), parameters[0]);
     // std::cout<<poseParameterBlock_0.estimate().T()<<std::endl;
     static_cast<ceres_backend::ImuError*>(cost_function_imu)
         ->Evaluate(parameters, residuals_p.data(), NULL);
@@ -279,7 +279,7 @@ TEST(okvisTestSuite, ImuError) {
     poseParameterBlock_0.setEstimate(T_WS_0);  // reset
     dp_0[i] = -dx;
     // std::cout<<residuals.transpose()<<std::endl;
-    pose_manifold->Plus(parameters[0], dp_0.data(), parameters[0]);
+    poseLocalParameterization->Plus(parameters[0], dp_0.data(), parameters[0]);
     // std::cout<<poseParameterBlock_0.estimate().T()<<std::endl;
     static_cast<ceres_backend::ImuError*>(cost_function_imu)
         ->Evaluate(parameters, residuals_m.data(), NULL);
@@ -294,7 +294,7 @@ TEST(okvisTestSuite, ImuError) {
   // std::cout << "minimal Jacobian 0 = \n"<<J0min<<std::endl;
   // std::cout << "numDiff minimal Jacobian 0 = \n"<<J0_numDiff<<std::endl;
   Eigen::Matrix<double, 7, 6, Eigen::RowMajor> Jplus;
-  pose_manifold->PlusJacobian(parameters[0], Jplus.data());
+  poseLocalParameterization->PlusJacobian(parameters[0], Jplus.data());
   // std::cout << "Jacobian 0 times Plus Jacobian = \n"<<J0*Jplus<<std::endl;
 
   Eigen::Matrix<double, 15, 6> J2_numDiff;
@@ -304,12 +304,12 @@ TEST(okvisTestSuite, ImuError) {
     Eigen::Matrix<double, 15, 1> residuals_m;
     dp_1.setZero();
     dp_1[i] = dx;
-    pose_manifold->Plus(parameters[2], dp_1.data(), parameters[2]);
+    poseLocalParameterization->Plus(parameters[2], dp_1.data(), parameters[2]);
     static_cast<ceres_backend::ImuError*>(cost_function_imu)
         ->Evaluate(parameters, residuals_p.data(), NULL);
     poseParameterBlock_1.setEstimate(T_WS_1_disturbed);  // reset
     dp_1[i] = -dx;
-    pose_manifold->Plus(parameters[2], dp_1.data(), parameters[2]);
+    poseLocalParameterization->Plus(parameters[2], dp_1.data(), parameters[2]);
     static_cast<ceres_backend::ImuError*>(cost_function_imu)
         ->Evaluate(parameters, residuals_m.data(), NULL);
     poseParameterBlock_1.setEstimate(T_WS_1_disturbed);  // reset
@@ -319,7 +319,7 @@ TEST(okvisTestSuite, ImuError) {
                                                                << J2min << std::endl
                                                                << "numDiff minimal Jacobian 2 = \n"
                                                                << J2_numDiff;
-  pose_manifold->PlusJacobian(parameters[2], Jplus.data());
+  poseLocalParameterization->PlusJacobian(parameters[2], Jplus.data());
   // std::cout << "Jacobian 2 times Plus Jacobian = \n"<<J2*Jplus<<std::endl;
 
   Eigen::Matrix<double, 15, 9> J1_numDiff;

@@ -40,8 +40,6 @@
 
 #include "svo/ceres_backend/pose_parameter_block.hpp"
 
-#include <iostream>
-
 namespace svo {
 namespace ceres_backend {
 
@@ -75,11 +73,6 @@ void PoseParameterBlock::setEstimate(const Transformation& T_WS) {
 // getters
 // Get estimate.
 Transformation PoseParameterBlock::estimate() const {
-  std::cout << "Estimate quaternion: w=" << parameters_[6] << " x=" << parameters_[3]
-            << " y=" << parameters_[4] << " z=" << parameters_[5] << " norm="
-            << std::sqrt(parameters_[3] * parameters_[3] + parameters_[4] * parameters_[4] +
-                         parameters_[5] * parameters_[5] + parameters_[6] * parameters_[6])
-            << std::endl;
   return Transformation(
       Eigen::Vector3d(parameters_[0], parameters_[1], parameters_[2]),
       Eigen::Quaterniond(parameters_[6], parameters_[3], parameters_[4], parameters_[5]));
