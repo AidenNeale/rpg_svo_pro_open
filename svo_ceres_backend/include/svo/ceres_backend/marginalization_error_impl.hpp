@@ -56,26 +56,15 @@ void MarginalizationError::splitSymmetricMatrix(
 {
   // sanity check
   const int size = A.cols();
-  if (size != A.rows()) {
-    throw std::runtime_error("matrix not symmetric");
-  }
-  if (V.cols() != V.rows()) {
-    throw std::runtime_error("matrix not symmetric");
-  }
-  if (V.cols() != W.cols()) {
-    throw std::runtime_error("matrix not symmetric");
-  }
-  if (U.rows() != W.rows()) {
-    throw std::runtime_error("matrix not symmetric");
-  }
-  if (V.rows() + U.rows() != size) {
-    throw std::runtime_error(
-        "matrices supplied to be split into do not form exact upper triangular blocks of the "
-        "original one");
-  }
-  if (U.cols() != U.rows()) {
-    throw std::runtime_error("matrix not symmetric");
-  }
+  CHECK(size == A.rows()) << "matrix not symmetric";
+  CHECK(V.cols() == V.rows()) << "matrix not symmetric";
+  CHECK(V.cols() == W.cols()) << "matrix not symmetric";
+  CHECK(U.rows() == W.rows()) << "matrix not symmetric";
+  CHECK(V.rows() + U.rows() == size)
+      << "matrices supplied to be split into do not form exact upper triangular "
+      << "blocks of the original one";
+  CHECK(U.cols() == U.rows()) << "matrix not symmetric";
+
   //! @todo i'm sure this copy can be avoided as well..
   std::vector<std::pair<int, int> > marginalization_start_idx_and_length_pairs2 =
       marginalization_start_idx_and_length_pairs;
@@ -139,19 +128,11 @@ void MarginalizationError::splitVector(
 {
   const int size = b.rows();
   // sanity check
-  if (b.cols() != 1) {
-    throw std::runtime_error("supplied vector b not x-by-1");
-  }
-  if (b_a.cols() != 1) {
-    throw std::runtime_error("supplied vector b_a not x-by-1");
-  }
-  if (b_b.cols() != 1) {
-    throw std::runtime_error("supplied vector b_b not x-by-1");
-  }
-  if (b_a.rows() + b_b.rows() != size) {
-    throw std::runtime_error(
-        "vector supplied to be split into cannot be concatenated to the original one");
-  }
+  CHECK(b.cols() == 1) << "supplied vector not x-by-1";
+  CHECK(b_a.cols() == 1) << "supplied vector not x-by-1";
+  CHECK(b_b.cols() == 1) << "supplied vector not x-by-1";
+  CHECK(b_a.rows() + b_b.rows() == size)
+      << "vector supplied to be split into cannot be concatenated to the original one";
 
   //! @todo remove this copy. If the last n entries of b are to be kept deal
   //! with this some other way. E.g. after loop. if (lastidx != size) ...
@@ -194,9 +175,7 @@ template <typename Derived>
 bool MarginalizationError::pseudoInverseSymm(const Eigen::MatrixBase<Derived>& a,
                                              const Eigen::MatrixBase<Derived>& result,
                                              double epsilon, int* rank) {
-  if (a.rows() != a.cols()) {
-    throw std::runtime_error("Matrix supplied is not quadratic");
-  }
+  CHECK(a.rows() == a.cols()) << "matrix supplied is not quadratic";
 
   Eigen::SelfAdjointEigenSolver<Derived> saes(a);
 
@@ -228,9 +207,7 @@ template <typename Derived>
 bool MarginalizationError::pseudoInverseSymmSqrt(const Eigen::MatrixBase<Derived>& a,
                                                  const Eigen::MatrixBase<Derived>& result,
                                                  double epsilon, int* rank) {
-  if (a.rows() != a.cols()) {
-    throw std::runtime_error("matrix supplied is not quadratic");
-  }
+  CHECK(a.rows() == a.cols()) << "matrix supplied is not quadratic";
 
   Eigen::SelfAdjointEigenSolver<Derived> saes(a);
 
@@ -262,9 +239,7 @@ bool MarginalizationError::pseudoInverseSymmSqrt(const Eigen::MatrixBase<Derived
 template <typename Derived, int blockDim>
 void MarginalizationError::blockPinverse(const Eigen::MatrixBase<Derived>& M_in,
                                          const Eigen::MatrixBase<Derived>& M_out, double epsilon) {
-  if (M_in.rows() != M_in.cols()) {
-    throw std::runtime_error("matrix supplied is not quadratic");
-  }
+  CHECK(M_in.rows() == M_in.cols()) << "matrix supplied is not quadratic";
 
   const_cast<Eigen::MatrixBase<Derived>&>(M_out).resize(M_in.rows(), M_in.rows());
   const_cast<Eigen::MatrixBase<Derived>&>(M_out).setZero();
@@ -286,9 +261,8 @@ template <typename Derived, int blockDim>
 void MarginalizationError::blockPinverseSqrt(const Eigen::MatrixBase<Derived>& M_in,
                                              const Eigen::MatrixBase<Derived>& M_out,
                                              double epsilon) {
-  if (M_in.rows() != M_in.cols()) {
-    throw std::runtime_error("matrix supplied is not quadratic");
-  }
+  CHECK(M_in.rows() == M_in.cols()) << "matrix supplied is not quadratic";
+
   const_cast<Eigen::MatrixBase<Derived>&>(M_out).resize(M_in.rows(), M_in.rows());
   const_cast<Eigen::MatrixBase<Derived>&>(M_out).setZero();
   for (int i = 0; i < M_in.cols(); i += blockDim) {

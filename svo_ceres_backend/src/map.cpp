@@ -53,6 +53,9 @@ namespace ceres_backend {
 // Constructor.
 Map::Map() : residual_counter_(0) {
   ceres::Problem::Options problemOptions;
+  problemOptions.manifold_ownership = ceres::Ownership::DO_NOT_TAKE_OWNERSHIP;
+  problemOptions.loss_function_ownership = ceres::Ownership::DO_NOT_TAKE_OWNERSHIP;
+  problemOptions.cost_function_ownership = ceres::Ownership::DO_NOT_TAKE_OWNERSHIP;
   // problemOptions.enable_fast_parameter_block_removal = true;
   problem_.reset(new ceres::Problem(problemOptions));
   // options.linear_solver_ordering = new ceres::ParameterBlockOrdering;
@@ -69,31 +72,29 @@ bool Map::parameterBlockExists(uint64_t parameter_block_id) const {
 // Log information on a parameter block.
 void Map::printParameterBlockInfo(uint64_t parameter_block_id) const {
   ResidualBlockCollection residualCollection = residuals(parameter_block_id);
-  std::cout << "parameter info" << std::endl
+  LOG(INFO) << "parameter info" << std::endl
             << "----------------------------" << std::endl
             << " - block Id: " << parameter_block_id << std::endl
             << " - type: " << parameterBlockPtr(parameter_block_id)->typeInfo() << std::endl
             << " - residuals (" << residualCollection.size() << "):";
   for (size_t i = 0; i < residualCollection.size(); ++i) {
-    std::cout << "   - id: " << residualCollection.at(i).residual_block_id << std::endl
+    LOG(INFO) << "   - id: " << residualCollection.at(i).residual_block_id << std::endl
               << "   - type: "
               << kErrorToStr.at(
                      errorInterfacePtr(residualCollection.at(i).residual_block_id)->typeInfo());
   }
-  std::cout << "============================";
+  LOG(INFO) << "============================";
 }
 
 // Log information on a residual block.
 void Map::printResidualBlockInfo(ceres::ResidualBlockId residual_block_id) const {
-  std::cout << "   - id: " << residual_block_id << std::endl
+  LOG(INFO) << "   - id: " << residual_block_id << std::endl
             << "   - type: " << kErrorToStr.at(errorInterfacePtr(residual_block_id)->typeInfo());
 }
 
 // Obtain the Hessian block for a specific parameter block.
 void Map::getLhs(uint64_t parameter_block_id, Eigen::MatrixXd& H) {
-  if (!parameterBlockExists(parameter_block_id)) {
-    throw std::runtime_error("parameter block not in map.");
-  }
+  CHECK(parameterBlockExists(parameter_block_id)) << "parameter block not in map.";
   ResidualBlockCollection res = residuals(parameter_block_id);
   H.setZero();
   for (size_t i = 0; i < res.size(); ++i) {
@@ -221,11 +222,11 @@ bool Map::isMinimalJacobianCorrect(ceres::ResidualBlockId residual_block_id, dou
     double max_diff_minimal = std::max(-J_diff_minimal.minCoeff(), J_diff_minimal.maxCoeff());
 
     if (max_diff_minimal / norm_minimal > relTol) {
-      std::cout << "Minimal Jacobian inconsistent: "
+      LOG(INFO) << "Minimal Jacobian inconsistent: "
                 << kErrorToStr.at(error_interface_ptr->typeInfo());
-      std::cout << "num diff Jacobian[" << i << "]:\n" << J_min_numDiff[i];
-      std::cout << "provided Jacobian[" << i << "]:\n" << J_min[i];
-      std::cout << "relative error: " << max_diff_minimal / norm_minimal
+      LOG(INFO) << "num diff Jacobian[" << i << "]:\n" << J_min_numDiff[i];
+      LOG(INFO) << "provided Jacobian[" << i << "]:\n" << J_min[i];
+      LOG(INFO) << "relative error: " << max_diff_minimal / norm_minimal
                 << ", relative tolerance: " << relTol;
       isCorrect = false;
     }
@@ -237,16 +238,14 @@ bool Map::isMinimalJacobianCorrect(ceres::ResidualBlockId residual_block_id, dou
 // Add a parameter block to the map
 bool Map::addParameterBlock(std::shared_ptr<ceres_backend::ParameterBlock> parameter_block,
                             int parameterization, const int /*group*/) {
-  if (!parameter_block) {
-    throw std::invalid_argument("Cannot add a null parameter block.");
-  }
-  std::cout << "Adding parameter block with parameterization " << parameterization << " and id "
+  CHECK(parameter_block != nullptr);
+  VLOG(200) << "Adding parameter block with parameterization " << parameterization << " and id "
             << BackendId(parameter_block->id());
 
   // check Id availability
   if (parameterBlockExists(parameter_block->id())) {
-    std::cerr << "Parameter block with id " << BackendId(parameter_block->id())
-              << " exists already!";
+    LOG(ERROR) << "Parameter block with id " << BackendId(parameter_block->id())
+               << " exists already!";
     return false;
   }
 
@@ -273,7 +272,7 @@ bool Map::addParameterBlock(std::shared_ptr<ceres_backend::ParameterBlock> param
       break;
     }
     default: {
-      std::cerr << "Unknown parameterization!";
+      LOG(ERROR) << "Unknown parameterization!";
       return false;
       break;  // just for consistency...
     }
@@ -294,7 +293,7 @@ bool Map::removeParameterBlock(uint64_t parameter_block_id) {
   if (!parameterBlockExists(parameter_block_id)) {
     return false;
   }
-  std::cout << "Removing paramter block with ID " << BackendId(parameter_block_id);
+  VLOG(200) << "Removing paramter block with ID " << BackendId(parameter_block_id);
 
   // remove all connected residuals
   const ResidualBlockCollection res = residuals(parameter_block_id);
@@ -337,15 +336,14 @@ ceres::ResidualBlockId Map::addResidualBlock(
     for (auto block : parameter_block_ptrs) {
       s << BackendId(block->id()) << "\n";
     }
-    std::cout << s.str();
+    VLOG(200) << s.str();
   }
 
   // add in book-keeping
   std::shared_ptr<ErrorInterface> error_interface_ptr =
       std::dynamic_pointer_cast<ErrorInterface>(cost_function);
-  if (error_interface_ptr == 0) {
-    throw std::runtime_error("Supplied a cost function without ceres_backend::ErrorInterface");
-  }
+  CHECK(error_interface_ptr != 0)
+      << "Supplied a cost function without ceres_backend::ErrorInterface";
   residual_block_id_to_residual_block_spec_map_.insert(
       std::pair<ceres::ResidualBlockId, ResidualBlockSpec>(
           return_id, ResidualBlockSpec(return_id, loss_function, error_interface_ptr)));
@@ -383,9 +381,7 @@ ceres::ResidualBlockId Map::addResidualBlock(std::shared_ptr<ceres::CostFunction
                                              std::shared_ptr<ceres_backend::ParameterBlock> x7,
                                              std::shared_ptr<ceres_backend::ParameterBlock> x8,
                                              std::shared_ptr<ceres_backend::ParameterBlock> x9) {
-  if (!cost_function) {
-    throw std::invalid_argument("Map::addResidualBlock: cost_function must not be null.");
-  }
+  CHECK(cost_function != nullptr);
   std::vector<std::shared_ptr<ceres_backend::ParameterBlock> > parameter_block_ptrs;
   if (x0 != 0) {
     parameter_block_ptrs.push_back(x0);
@@ -430,17 +426,14 @@ void Map::resetResidualBlock(
   // remove residual from old parameter set
   ResidualBlockIdToParameterBlockCollectionMap::iterator it =
       residual_block_id_to_parameter_block_collection_map_.find(residual_block_id);
-  if (it == residual_block_id_to_parameter_block_collection_map_.end()) {
-    throw std::runtime_error("Map::resetResidualBlock: residual block not in map. Cannot reset.");
-  }
+  CHECK(it != residual_block_id_to_parameter_block_collection_map_.end())
+      << "residual block not in map.";
   for (ParameterBlockCollection::iterator parameter_it = it->second.begin();
        parameter_it != it->second.end(); ++parameter_it) {
     uint64_t parameter_id = parameter_it->second->id();
     std::pair<IdToResidualBlockMultimap::iterator, IdToResidualBlockMultimap::iterator> range =
         id_to_residual_block_multimap_.equal_range(parameter_id);
-    if (range.first == id_to_residual_block_multimap_.end()) {
-      throw std::runtime_error("book-keeping is broken");
-    }
+    CHECK(range.first != id_to_residual_block_multimap_.end()) << "book-keeping is broken";
     for (IdToResidualBlockMultimap::iterator it2 = range.first; it2 != range.second;) {
       if (residual_block_id == it2->second.residual_block_id) {
         it2 = id_to_residual_block_multimap_.erase(it2);  // remove book-keeping
@@ -469,7 +462,7 @@ void Map::resetResidualBlock(
 
 // Remove a residual block.
 bool Map::removeResidualBlock(ceres::ResidualBlockId residual_block_id) {
-  std::cout << "Removing residual block with ID " << residual_block_id;
+  VLOG(200) << "Removing residual block with ID " << residual_block_id;
   problem_->RemoveResidualBlock(residual_block_id);  // remove in ceres
 
   ResidualBlockIdToParameterBlockCollectionMap::iterator it =
@@ -483,9 +476,7 @@ bool Map::removeResidualBlock(ceres::ResidualBlockId residual_block_id) {
     uint64_t parameter_id = parameter_it->second->id();
     std::pair<IdToResidualBlockMultimap::iterator, IdToResidualBlockMultimap::iterator> range =
         id_to_residual_block_multimap_.equal_range(parameter_id);
-    if (range.first == id_to_residual_block_multimap_.end()) {
-      throw std::runtime_error("book-keeping is broken");
-    }
+    CHECK(range.first != id_to_residual_block_multimap_.end()) << "book-keeping is broken";
 
     for (IdToResidualBlockMultimap::iterator it2 = range.first; it2 != range.second;) {
       if (residual_block_id == it2->second.residual_block_id) {
@@ -518,12 +509,8 @@ bool Map::isParameterBlockConstant(uint64_t parameter_block_id) {
   }
   std::shared_ptr<ParameterBlock> parameter_block =
       id_to_parameter_block_map_.find(parameter_block_id)->second;
-  if (problem_->IsParameterBlockConstant(parameter_block->parameters()) !=
-      parameter_block->fixed()) {
-    throw std::runtime_error(
-        "Map::isParameterBlockConstant: parameter block fixed state does not match "
-        "ceres problem state.");
-  }
+  CHECK_EQ(problem_->IsParameterBlockConstant(parameter_block->parameters()),
+           parameter_block->fixed());
   return parameter_block->fixed();
 }
 
@@ -589,10 +576,8 @@ bool Map::setParameterization(uint64_t parameter_block_id,
 // Get a shared pointer to a parameter block.
 std::shared_ptr<ceres_backend::ParameterBlock> Map::parameterBlockPtr(uint64_t parameter_block_id) {
   // get a parameterBlock
-  if (!parameterBlockExists(parameter_block_id)) {
-    throw std::runtime_error("parameterBlock with id " + BackendId(parameter_block_id).toString() +
-                             " does not exist");
-  }
+  CHECK(parameterBlockExists(parameter_block_id))
+      << "parameterBlock with id " << BackendId(parameter_block_id) << " does not exist";
   if (parameterBlockExists(parameter_block_id)) {
     return id_to_parameter_block_map_.find(parameter_block_id)->second;
   }

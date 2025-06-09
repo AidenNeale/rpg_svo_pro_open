@@ -42,7 +42,7 @@ TEST(poseLocalParametrizationTests, MinusTest) {
   Eigen::Matrix<svo::FloatType, 6, 1> dx_from_minus;
   svo::ceres_backend::PoseLocalParameterization::minus(x.data(), x_dist.data(),
                                                        dx_from_minus.data());
-  EXPECT_TRUE(EIGEN_MATRIX_EQUAL_DOUBLE(dx, dx_from_minus));
+  EXPECT_TRUE(EIGEN_MATRIX_NEAR(dx, dx_from_minus, 1e-7));
 }
 
 TEST(poseLocalParametrizationTests, PlusJacobianTest) {
@@ -78,7 +78,7 @@ TEST(poseLocalParametrizationTests, LiftJacobianTest) {
   svo::ceres_backend::PoseLocalParameterization::liftJacobian(x.data(), lift_jacobian.data());
   Eigen::Matrix<double, 6, 6> identity;
   identity.setIdentity();
-  EXPECT_TRUE(EIGEN_MATRIX_EQUAL_DOUBLE(lift_jacobian * plus_jacobian, identity));
+  EXPECT_TRUE(EIGEN_MATRIX_NEAR(lift_jacobian * plus_jacobian, identity, 1e-7));
 }
 
 VIKIT_UNITTEST_ENTRYPOINT

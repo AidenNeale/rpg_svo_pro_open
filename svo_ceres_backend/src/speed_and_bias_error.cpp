@@ -55,18 +55,9 @@ SpeedAndBiasError::SpeedAndBiasError(const SpeedAndBias& measurement, double spe
                                      double gyr_bias_variance, double acc_bias_variance) {
   setMeasurement(measurement);
 
-  if (std::abs(speed_variance) < 1e-12) {
-    throw std::runtime_error(
-        "Speed variance must not be zero (or near zero) in SpeedAndBiasError constructor.");
-  }
-  if (std::abs(gyr_bias_variance) < 1e-12) {
-    throw std::runtime_error(
-        "Gyro bias variance must not be zero (or near zero) in SpeedAndBiasError constructor.");
-  }
-  if (std::abs(acc_bias_variance) < 1e-12) {
-    throw std::runtime_error(
-        "Accel bias variance must not be zero (or near zero) in SpeedAndBiasError constructor.");
-  }
+  CHECK_NE(speed_variance, 0.0);
+  CHECK_NE(gyr_bias_variance, 0.0);
+  CHECK_NE(acc_bias_variance, 0.0);
   information_t information;
   information.setZero();
   information.topLeftCorner<3, 3>() = Eigen::Matrix3d::Identity() * 1.0 / speed_variance;

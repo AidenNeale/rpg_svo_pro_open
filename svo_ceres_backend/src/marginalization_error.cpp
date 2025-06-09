@@ -96,11 +96,8 @@ MarginalizationError::MarginalizationError(
   residual_block_id_ = 0;
   error_computation_valid_ = false;
   bool success = addResidualBlocks(residual_block_ids);
-  if (!success) {
-    throw std::runtime_error(
-        "residual blocks supplied or their connected parameter blocks were not properly added to "
-        "the map");
-  }
+  CHECK(success) << "residual blocks supplied or their connected parameter blocks were not "
+                    "properly added to the map";
 }
 
 // Set the underlying ceres_backend::Map.
@@ -129,13 +126,11 @@ bool MarginalizationError::addResidualBlocks(
 // Add some residuals to this marginalisation error. This means, they will get linearised.
 bool MarginalizationError::addResidualBlock(ceres::ResidualBlockId residual_block_id, bool keep) {
   // get the residual block & check
-  if (!map_ptr_) {
-    throw std::runtime_error("Map pointer is not set.");
-  }
   std::shared_ptr<ErrorInterface> error_interface_ptr =
       map_ptr_->errorInterfacePtr(residual_block_id);
-  if (!error_interface_ptr) {
-    throw std::runtime_error("Residual block id does not exist.");
+  CHECK(error_interface_ptr) << "residual block id does not exist.";
+  if (error_interface_ptr == nullptr) {
+    return false;
   }
 
   error_computation_valid_ = false;  // flag that the error computation is invalid
@@ -278,9 +273,8 @@ bool MarginalizationError::addResidualBlock(ceres::ResidualBlockId residual_bloc
       jacobians_minimal_eigen(parameters.size());
 
   for (size_t i = 0; i < parameters.size(); ++i) {
-    if (!isParameterBlockConnected(parameters[i].first)) {
-      throw std::runtime_error("ze bug: no linearization point, since not connected.");
-    }
+    CHECK(isParameterBlockConnected(parameters[i].first))
+        << "ze bug: no linearization point, since not connected.";
     parameters_raw[i] =
         parameter_block_infos_[parameter_block_id_to_parameter_block_info_idx_[parameters[i].first]]
             .linearization_point.get();  // first estimate Jacobian!!
@@ -302,10 +296,8 @@ bool MarginalizationError::addResidualBlock(ceres::ResidualBlockId residual_bloc
                                           .find(residual_block_id)
                                           ->second.loss_function_ptr;
   if (lossFunction) {
-    if (map_ptr_->residualBlockIdToResidualBlockSpecMap().find(residual_block_id) ==
-        map_ptr_->residualBlockIdToResidualBlockSpecMap().end()) {
-      throw std::runtime_error("addResidualBlock: loss function not found.");
-    }
+    CHECK(map_ptr_->residualBlockIdToResidualBlockSpecMap().find(residual_block_id) !=
+          map_ptr_->residualBlockIdToResidualBlockSpecMap().end());
 
     // following ceres in internal/ceres/corrector.cc
     const double sq_norm = residuals_eigen.transpose() * residuals_eigen;
@@ -330,11 +322,7 @@ bool MarginalizationError::addResidualBlock(ceres::ResidualBlockId residual_bloc
       // this point, we know that D > 1.0.
 
       const double alpha = 1.0 - sqrt(D);
-      if (std::isnan(alpha)) {
-        throw std::runtime_error(
-            "MarginalizationError::addResidualBlock: NaN in alpha calculation. "
-            "This is likely due to a bad loss function.");
-      }
+      CHECK(!std::isnan(alpha));
 
       // Calculate the constants needed by the correction routines.
       residual_scaling = sqrt_rho1 / (1 - alpha);
@@ -358,17 +346,14 @@ bool MarginalizationError::addResidualBlock(ceres::ResidualBlockId residual_bloc
     ParameterBlockInfo parameterBlockInfo_i = parameter_block_infos_.at(
         parameter_block_id_to_parameter_block_info_idx_[parameters[i].first]);
 
-    if (parameterBlockInfo_i.parameter_block_id != parameters[i].second->id()) {
-      throw std::runtime_error("ze bug: inconsistent ze ordering");
-    }
+    CHECK(parameterBlockInfo_i.parameter_block_id == parameters[i].second->id())
+        << "ze bug: inconsistent ze ordering";
 
     if (parameterBlockInfo_i.minimal_dimension == 0) {
       continue;
     }
 
-    if (!H_.allFinite()) {
-      throw std::runtime_error("Hessian matrix is not finite. This is a bug.");
-    }
+    CHECK(H_.allFinite());
 
     // Insert Hessian and rhs in diagonal.
     H_.block(parameterBlockInfo_i.ordering_idx, parameterBlockInfo_i.ordering_idx,
@@ -377,18 +362,16 @@ bool MarginalizationError::addResidualBlock(ceres::ResidualBlockId residual_bloc
     b0_.segment(parameterBlockInfo_i.ordering_idx, parameterBlockInfo_i.minimal_dimension) -=
         jacobians_minimal_eigen.at(i).transpose().eval() * residuals_eigen;
 
-    if (!H_.allFinite()) {
-      throw std::runtime_error("Hessian matrix is not finite. This is a bug.");
-    }
+    CHECK(H_.allFinite()) << jacobians_minimal_eigen.at(i).transpose().eval() *
+                                 jacobians_minimal_eigen.at(i);
 
     for (size_t j = 0; j < i; ++j) {
       // Now the parts not in the diagonal
       ParameterBlockInfo parameterBlockInfo_j = parameter_block_infos_.at(
           parameter_block_id_to_parameter_block_info_idx_[parameters[j].first]);
 
-      if (parameterBlockInfo_j.parameter_block_id != parameters[j].second->id()) {
-        throw std::runtime_error("ze bug: inconstistent ze ordering");
-      }
+      CHECK(parameterBlockInfo_j.parameter_block_id == parameters[j].second->id())
+          << "ze bug: inconstistent ze ordering";
 
       if (parameterBlockInfo_j.minimal_dimension == 0) {
         continue;
@@ -422,12 +405,8 @@ bool MarginalizationError::addResidualBlock(ceres::ResidualBlockId residual_bloc
 
 // Info: is this parameter block connected to this marginalization error?
 bool MarginalizationError::isParameterBlockConnected(uint64_t parameter_block_id) {
-  if (!map_ptr_) {
-    throw std::runtime_error("Map pointer is not set.");
-  }
-  if (!map_ptr_->parameterBlockExists(parameter_block_id)) {
-    throw std::runtime_error("this parameter block does not even exist in the map...");
-  }
+  CHECK(map_ptr_->parameterBlockExists(parameter_block_id))
+      << "this parameter block does not even exist in the map...";
   std::map<uint64_t, size_t>::iterator it =
       parameter_block_id_to_parameter_block_info_idx_.find(parameter_block_id);
   if (it == parameter_block_id_to_parameter_block_info_idx_.end())
@@ -438,86 +417,44 @@ bool MarginalizationError::isParameterBlockConnected(uint64_t parameter_block_id
 
 // Checks the internal datastructure (debug)
 void MarginalizationError::check() {
-  if (!map_ptr_) {
-    throw std::runtime_error("Map pointer is not set.");
-  }
   // check basic sizes
-  if (base_t::parameter_block_sizes().size() != parameter_block_infos_.size()) {
-    throw std::runtime_error("Parameter block sizes do not match the number of parameter blocks.");
-  }
-  if (parameter_block_id_to_parameter_block_info_idx_.size() != parameter_block_infos_.size()) {
-    throw std::runtime_error(
-        "Parameter block id to parameter block info idx size does not match the "
-        "number of parameter blocks.");
-  }
-  if (base_t::num_residuals() != H_.cols()) {
-    throw std::runtime_error("Hessian matrix columns size does not match the number of residuals.");
-  }
-  if (base_t::num_residuals() != H_.rows()) {
-    throw std::runtime_error("Hessian matrix rows size does not match the number of residuals.");
-  }
-  if (base_t::num_residuals() != b0_.rows()) {
-    throw std::runtime_error("b0_ vector size does not match the number of residuals.");
-  }
-  if (parameter_block_infos_.size() < dense_indices_) {
-    throw std::runtime_error("Dense indices is larger than the number of parameter blocks.");
-  }
+  CHECK(base_t::parameter_block_sizes().size() == parameter_block_infos_.size());
+  CHECK(parameter_block_id_to_parameter_block_info_idx_.size() == parameter_block_infos_.size());
+  CHECK(base_t::num_residuals() == H_.cols());
+  CHECK(base_t::num_residuals() == H_.rows());
+  CHECK(base_t::num_residuals() == b0_.rows());
+  CHECK(parameter_block_infos_.size() >= dense_indices_);
   int totalsize = 0;
   // check parameter block sizes
   for (size_t i = 0; i < parameter_block_infos_.size(); ++i) {
     totalsize += parameter_block_infos_[i].minimal_dimension;
-    if (parameter_block_infos_[i].dimension != size_t(base_t::parameter_block_sizes()[i])) {
-      throw std::runtime_error(
-          "Parameter block dimension does not match the size in the book-keeping.");
-    }
-    if (!map_ptr_->parameterBlockExists(parameter_block_infos_[i].parameter_block_id)) {
-      throw std::runtime_error("Parameter block id does not exist in the map: " +
-                               std::to_string(parameter_block_infos_[i].parameter_block_id));
-    }
-    if (parameter_block_id_to_parameter_block_info_idx_[parameter_block_infos_[i]
-                                                            .parameter_block_id] != i) {
-      throw std::runtime_error(
-          "Parameter block id to parameter block info idx does not match the index in the book-"
-          "keeping: " +
-          std::to_string(parameter_block_infos_[i].parameter_block_id) +
-          " != " + std::to_string(i));
-    }
+    CHECK(parameter_block_infos_[i].dimension == size_t(base_t::parameter_block_sizes()[i]));
+    CHECK(map_ptr_->parameterBlockExists(parameter_block_infos_[i].parameter_block_id));
+    CHECK(parameter_block_id_to_parameter_block_info_idx_[parameter_block_infos_[i]
+                                                              .parameter_block_id] == i);
     if (i < dense_indices_) {
-      if (parameter_block_infos_[i].is_landmark) {
-        throw std::runtime_error("Dense parameter block info is marked as landmark: " +
-                                 std::to_string(parameter_block_infos_[i].parameter_block_id));
-      }
+      CHECK(!parameter_block_infos_[i].is_landmark);
     } else {
-      if (!parameter_block_infos_[i].is_landmark) {
-        throw std::runtime_error("Landmark parameter block info is not marked as landmark: " +
-                                 std::to_string(parameter_block_infos_[i].parameter_block_id));
-      }
+      CHECK(parameter_block_infos_[i].is_landmark);
     }
   }
   // check contiguous
   for (size_t i = 1; i < parameter_block_infos_.size(); ++i) {
-    if (parameter_block_infos_[i - 1].ordering_idx +
-            parameter_block_infos_[i - 1].minimal_dimension !=
-        parameter_block_infos_[i].ordering_idx) {
-      throw std::runtime_error(std::to_string(parameter_block_infos_[i - 1].ordering_idx) + " + " +
-                               std::to_string(parameter_block_infos_[i - 1].minimal_dimension) +
-                               " == " + std::to_string(parameter_block_infos_[i].ordering_idx));
-    }
+    CHECK(parameter_block_infos_[i - 1].ordering_idx +
+              parameter_block_infos_[i - 1].minimal_dimension ==
+          parameter_block_infos_[i].ordering_idx)
+        << parameter_block_infos_[i - 1].ordering_idx << "+"
+        << parameter_block_infos_[i - 1].minimal_dimension
+        << "==" << parameter_block_infos_[i].ordering_idx;
   }
   // check dimension again
-  if (base_t::num_residuals() != totalsize) {
-    throw std::runtime_error(
-        "Total size of the parameter blocks does not match the number of residuals: " +
-        std::to_string(totalsize) + " != " + std::to_string(base_t::num_residuals()));
-  }
+  CHECK(base_t::num_residuals() == totalsize);
 }
 
 // Call this in order to (re-)add this error term after whenever it had been modified.
 void MarginalizationError::getParameterBlockPtrs(
     std::vector<std::shared_ptr<ceres_backend::ParameterBlock>>& parameter_block_ptrs) {
-  if (!map_ptr_) {
-    throw std::runtime_error("no Map object passed ever!");
-  }
+  CHECK_NOTNULL(map_ptr_) << "no Map object passed ever!";
   for (size_t i = 0; i < parameter_block_infos_.size(); ++i) {
     parameter_block_ptrs.push_back(parameter_block_infos_[i].parameter_block_ptr);
   }
@@ -533,13 +470,10 @@ bool MarginalizationError::marginalizeOut(const std::vector<uint64_t>& parameter
   // copy so we can manipulate
   std::vector<uint64_t> parameter_block_ids_copy = parameter_block_ids;
   if (parameter_block_ids.size() != keep_parameter_blocks.size()) {
-    if (keep_parameter_blocks.size() != 0) {
-      throw std::runtime_error(
-          "Input vectors must either be of same size or omit optional parameter "
-          "keepParameterBlocks: " +
-          std::to_string(parameter_block_ids.size()) + " vs " +
-          std::to_string(keep_parameter_blocks.size()));
-    }
+    CHECK(keep_parameter_blocks.size() == 0)
+        << "input vectors must either be of same size or omit optional parameter "
+           "keepParameterBlocks: "
+        << parameter_block_ids.size() << " vs " << keep_parameter_blocks.size();
   }
   std::map<uint64_t, bool> parameter_block_ptrs;
   for (size_t i = 0; i < parameter_block_ids_copy.size(); ++i) {
@@ -569,13 +503,12 @@ bool MarginalizationError::marginalizeOut(const std::vector<uint64_t>& parameter
         parameter_block_id_to_parameter_block_info_idx_.find(parameter_block_ids_copy[i]);
 
     // sanity check - are we trying to marginalize stuff that is not connected to this error term?
+    CHECK(it != parameter_block_id_to_parameter_block_info_idx_.end())
+        << "trying to marginalize out unconnected parameter block id = "
+        << parameter_block_ids_copy[i];
     if (it == parameter_block_id_to_parameter_block_info_idx_.end()) {
-      throw std::runtime_error("Trying to marginalize out unconnected parameter block id = " +
-                               std::to_string(parameter_block_ids_copy[i]));
-    }
-    if (it == parameter_block_id_to_parameter_block_info_idx_.end()) {
-      std::cerr << "trying to marginalize out unconnected parameter block id = "
-                << parameter_block_ids_copy[i];
+      LOG(ERROR) << "trying to marginalize out unconnected parameter block id = "
+                 << parameter_block_ids_copy[i];
       return false;
     }
 
@@ -786,26 +719,21 @@ bool MarginalizationError::marginalizeOut(const std::vector<uint64_t>& parameter
     }
   }
 
-  if (!map_ptr_) {
-    throw std::runtime_error("Map pointer is not set.");
-  }
   // check if the removal is safe
   for (size_t i = 0; i < parameter_block_ids_copy.size(); ++i) {
     Map::ResidualBlockCollection residuals = map_ptr_->residuals(parameter_block_ids_copy[i]);
     if (residuals.size() != 0 && parameter_block_ptrs.at(parameter_block_ids_copy[i]) == false) {
       map_ptr_->printParameterBlockInfo(parameter_block_ids_copy[i]);
     }
-    if (residuals.size() != 0 || parameter_block_ptrs.at(parameter_block_ids_copy[i]) != true) {
-      throw std::runtime_error(
-          "Trying to marginalize out a parameterBlock that is still connected to other error "
-          "terms. keep = " +
-          int(parameter_block_ptrs.at(parameter_block_ids_copy[i])));
-    }
+    CHECK(residuals.size() == 0 || parameter_block_ptrs.at(parameter_block_ids_copy[i]) == true)
+        << "trying to marginalize out a parameterBlock that is still connected "
+        << "to other error terms. keep = "
+        << int(parameter_block_ptrs.at(parameter_block_ids_copy[i]));
   }
   for (size_t i = 0; i < parameter_block_ids_copy.size(); ++i) {
     if (parameter_block_ptrs.at(parameter_block_ids_copy[i])) {
-      throw std::runtime_error(
-          "UnmarginalizeLandmark(parameter_block_ids_copy[i]) not implemented.");
+      LOG(FATAL) << "unmarginalizeLandmark(parameter_block_ids_copy[i]) "
+                 << "not implemented.";
     } else {
       map_ptr_->removeParameterBlock(parameter_block_ids_copy[i]);
     }
@@ -906,11 +834,9 @@ bool MarginalizationError::Evaluate(double const* const* parameters, double* res
 bool MarginalizationError::EvaluateWithMinimalJacobians(double const* const* parameters,
                                                         double* residuals, double** jacobians,
                                                         double** jacobians_minimal) const {
-  if (!error_computation_valid_) {
-    throw std::runtime_error(
-        "Trying to opmimize, but updateErrorComputation() was not called after adding residual "
-        "blocks/marginalizing");
-  }
+  CHECK(error_computation_valid_)
+      << "trying to opmimize, but updateErrorComputation() was not called "
+      << "after adding residual blocks/marginalizing";
 
   Eigen::VectorXd Delta_Chi;
   computeDeltaChi(parameters, Delta_Chi);

@@ -168,7 +168,7 @@ class CeresBackendInterface : public AbstractBundleAdjustment {
    * @param[out]  publisher Publisher handle, shared with frontend for
    *              benchmarking purposes.
    */
-  void makePublisher(std::shared_ptr<rclcpp::Node> nh_private,
+  void makePublisher(const std::shared_ptr<rclcpp::Node>& nh_private,
                      std::shared_ptr<CeresBackendPublisher>& publisher) {
     publisher_.reset(new CeresBackendPublisher(nh_private, backend_.getMap()));
     publisher = publisher_;

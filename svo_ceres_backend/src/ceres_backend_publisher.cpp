@@ -3,6 +3,8 @@
 #include <vikit/output_helper.h>
 #include <vikit/params_helper.h>
 
+#include <visualization_msgs/msg/marker.hpp>
+
 namespace {
 template <typename T>
 void normalizeVector(const std::vector<T>& in, std::vector<float>* out) {
@@ -19,7 +21,7 @@ void normalizeVector(const std::vector<T>& in, std::vector<float>* out) {
 }  // namespace
 
 namespace svo {
-CeresBackendPublisher::CeresBackendPublisher(std::shared_ptr<rclcpp::Node> nh_private,
+CeresBackendPublisher::CeresBackendPublisher(const std::shared_ptr<rclcpp::Node>& nh_private,
                                              const std::shared_ptr<ceres_backend::Map>& map_ptr)
     : pnh_(nh_private), map_ptr_(map_ptr) {
   pub_imu_pose_ =
@@ -50,11 +52,11 @@ void CeresBackendPublisher::publishImuPose(const ViNodeState& state, const int64
   if (n_pose_sub == 0 && n_pose_viz_sub == 0) {
     return;
   }
-  std::cout << "Publish IMU Pose";
+  VLOG(100) << "Publish IMU Pose";
 
   Eigen::Quaterniond q = state.get_T_W_B().getRotation().toImplementation();
   Eigen::Vector3d p = state.get_T_W_B().getPosition();
-  rclcpp::Time time(timestamp);
+  rclcpp::Time time = rclcpp::Time(timestamp);
 
   if (n_pose_sub > 0) {
     geometry_msgs::msg::PoseWithCovarianceStamped msg_pose;
@@ -114,6 +116,9 @@ void CeresBackendPublisher::publishBackendLandmarks(const int64_t timestamp) con
 
   // point clound to publish
   PointCloud pc;
+  rclcpp::Time pub_time = rclcpp::Time(timestamp);
+  pcl_conversions::toPCL(pub_time, pc.header.stamp);
+  pc.header.frame_id = kWorldFrame;
   pc.reserve(n_pts);
   for (size_t i = 0; i < landmark_pointers.size(); i++) {
     const auto p = landmark_pointers[i];
@@ -125,12 +130,12 @@ void CeresBackendPublisher::publishBackendLandmarks(const int64_t timestamp) con
     pc.push_back(pt);
   }
 
-  sensor_msgs::msg::PointCloud2 cloud_msg;
-  pcl::toROSMsg(pc, cloud_msg);
-  cloud_msg.header.frame_id = kWorldFrame;
-  cloud_msg.header.stamp = rclcpp::Time(timestamp);
-
-  pub_points_->publish(cloud_msg);
+  // Convert to sensor_msgs::msg::PointCloud2
+  sensor_msgs::msg::PointCloud2 msg_pc;
+  pcl::toROSMsg(pc, msg_pc);
+  msg_pc.header.stamp = rclcpp::Time(timestamp);
+  msg_pc.header.frame_id = kWorldFrame;
+  pub_points_->publish(msg_pc);
 }
 
 }  // namespace svo

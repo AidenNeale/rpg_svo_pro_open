@@ -80,9 +80,7 @@ struct States {
   States() = default;
 
   void addState(BackendId id, bool keyframe, double timestamp) {
-    if (id.type() != IdType::NFrame) {
-      throw std::runtime_error("Only NFrame IDs can be added to the state.");
-    }
+    CHECK(id.type() == IdType::NFrame);
     ids.push_back(id);
     is_keyframe.push_back(keyframe);
     timestamps.push_back(timestamp);
@@ -144,8 +142,7 @@ class Estimator {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   Estimator();
-  // Estimator(const Estimator&) = delete;
-  // Estimator& operator=(const Estimator&) = delete;
+
   /**
    * @brief Constructor if a ceres map is already available.
    * @param map_ptr Shared pointer to ceres map.
@@ -275,10 +272,8 @@ class Estimator {
    */
   bool isLandmarkAdded(BackendId landmark_id) const {
     bool isAdded = landmarks_map_.find(landmark_id) != landmarks_map_.end();
-    if (isAdded != map_ptr_->parameterBlockExists(landmark_id.asInteger())) {
-      throw std::runtime_error("id=" + landmark_id.toString() +
-                               " inconsistent. isAdded = " + std::to_string(isAdded));
-    }
+    CHECK(isAdded == map_ptr_->parameterBlockExists(landmark_id.asInteger()))
+        << "id=" << landmark_id << " inconsistent. isAdded = " << isAdded;
     return isAdded;
   }
 
@@ -467,10 +462,11 @@ class Estimator {
    */
   double timestamp(BackendId nframe_id) const {
     auto slot = states_.findSlot(nframe_id);
-    if (!slot.second) {
-      throw std::runtime_error("nframe_id not found in states.");
+    CHECK(slot.second) << "Frame with ID " << nframe_id << " does not exist.";
+    if (slot.second) {
+      return states_.timestamps[slot.first];
     }
-    return states_.timestamps[slot.first];
+    return 0;
   }
 
   /// @brief get ceres map
@@ -564,17 +560,13 @@ class Estimator {
 
   inline void checkAndAddToSet(const uint64_t id, std::set<uint64_t>* id_set) {
     auto it = std::find(id_set->begin(), id_set->end(), id);
-    if (it != id_set->end()) {
-      throw std::runtime_error(id_set->size() + ", " + id);
-    }
+    CHECK(it == id_set->end()) << id_set->size() << ", " << id;
     id_set->insert(id);
   }
 
   inline void checkAndDeleteFromSet(const uint64_t id, std::set<uint64_t>* id_set) {
     auto it = std::find(id_set->begin(), id_set->end(), id);
-    if (it == id_set->end()) {
-      throw std::runtime_error(id_set->size() + ", " + id);
-    }
+    CHECK(it != id_set->end()) << id_set->size() << ", " << id;
     id_set->erase(it);
   }
 

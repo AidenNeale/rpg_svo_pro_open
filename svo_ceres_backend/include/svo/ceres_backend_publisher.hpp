@@ -8,17 +8,15 @@
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-#include <boost/shared_ptr.hpp>
-#include <mutex>
-// #include <pcl_ros/point_cloud.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <mutex>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <svo/vio_common/backend_types.hpp>
-#include <visualization_msgs/msg/marker.hpp>
 
 #include "svo/ceres_backend/map.hpp"
+
 namespace svo {
 class CeresBackendPublisher {
  public:
@@ -28,7 +26,7 @@ class CeresBackendPublisher {
   using PointType = pcl::PointXYZI;
   const std::string kWorldFrame = "world";
 
-  CeresBackendPublisher(std::shared_ptr<rclcpp::Node> nh_private,
+  CeresBackendPublisher(const std::shared_ptr<rclcpp::Node>& nh_private,
                         const std::shared_ptr<ceres_backend::Map>& map_ptr);
   ~CeresBackendPublisher() {}
 

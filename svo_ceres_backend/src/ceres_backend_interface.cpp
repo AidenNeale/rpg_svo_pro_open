@@ -88,7 +88,7 @@ void CeresBackendInterface::loadMapFromBundleAdjustment(const FrameBundlePtr& ne
     updateBundleStateWithBackend(new_frames, true);
     have_motion_prior = true;
   } else {
-    std::cerr << "Could not add frame bundle " << new_frames->getBundleId() << " to backend";
+    LOG(ERROR) << "Could not add frame bundle " << new_frames->getBundleId() << " to backend";
     have_motion_prior = false;
   }
 
@@ -100,7 +100,7 @@ void CeresBackendInterface::loadMapFromBundleAdjustment(const FrameBundlePtr& ne
 
   // Update Frames and Map ---------------------------------------------------
   if (last_updated_nframe_ == last_optimized_nframe_.load()) {
-    std::cout << "VIN: No map update available.";
+    VLOG(3) << "VIN: No map update available.";
     return;
   }
 
@@ -110,19 +110,17 @@ void CeresBackendInterface::loadMapFromBundleAdjustment(const FrameBundlePtr& ne
     // Statistics
     int n_frames_updated = 0;
 
-    std::cout << "Updating states with latest results from ceres optimizer.";
+    VLOG(3) << "Updating states with latest results from ceres optimizer.";
     //! @todo this is not very efficient for multiple cameras,
     //! because we update each frame separately
     //! this we we need to get T_WS twice
     //! @todo store framebundles in map to solve problem
     for (FramePtr& keyframe : active_keyframes_) {
-      if (!keyframe) {
-        throw std::runtime_error("Found nullptr keyframe");
-      }
+      CHECK(keyframe) << "Found nullptr keyframe";
       updateFrameStateWithBackend(keyframe, false);
       n_frames_updated++;
     }
-    std::cout << "Updated " << n_frames_updated << " frames in map.";
+    VLOG(3) << "Updated " << n_frames_updated << " frames in map.";
 
     // Update the 3d points in map of the updated keyframes ----------------
     // Statistics
@@ -150,8 +148,8 @@ void CeresBackendInterface::loadMapFromBundleAdjustment(const FrameBundlePtr& ne
         }
         //! @todo should we only remove observation but leave points?
         backend_.removePointsByPointIds(deleted_points);
-        std::cout << "Outlier rejection: removed " << n_deleted_edges << " edgelets and "
-                  << n_deleted_corners << " corners.";
+        VLOG(6) << "Outlier rejection: removed " << n_deleted_edges << " edgelets and "
+                << n_deleted_corners << " corners.";
       }
     }
 
@@ -159,11 +157,8 @@ void CeresBackendInterface::loadMapFromBundleAdjustment(const FrameBundlePtr& ne
     // completeness.
     SpeedAndBias speed_and_bias;
     bool success = backend_.getSpeedAndBias(last_frames->getBundleId(), speed_and_bias);
-    if (!success) {
-      throw std::runtime_error(
-          "Could not get speed and bias estimate from ceres "
-          "optimizer");
-    }
+    CHECK(success) << "Could not get speed and bias estimate from ceres "
+                      "optimizer";
     imu_handler_->setAccelerometerBias(speed_and_bias.tail<3>());
     imu_handler_->setGyroscopeBias(speed_and_bias.segment<3>(3));
 
@@ -202,10 +197,11 @@ void CeresBackendInterface::bundleAdjustment(const FrameBundlePtr& frame_bundle)
 
       if (no_motion_counter_ > options_.backend_zero_motion_check_n_frames) {
         image_motion_detector_stationary_ = true;
-        std::cout << "Image is not moving: adding zero velocity prior.";
+        VLOG(5) << "Image is not moving: adding zero velocity prior.";
         if (!backend_.addVelocityPrior(createNFrameId(frame_bundle->getBundleId()),
                                        Eigen::Matrix<FloatType, 3, 1>::Zero(), sigma)) {
-          throw std::runtime_error("Failed to add a zero velocity prior!");
+          LOG(ERROR) << "Failed to add a zero velocity prior!";
+          CHECK(false) << "Not able to add velocity prior";
         } else {
           velocity_prior_added = true;
         }
@@ -218,11 +214,12 @@ void CeresBackendInterface::bundleAdjustment(const FrameBundlePtr& frame_bundle)
 
   // only use imu-based motion detection when the images are not good
   if (!image_motion_detector_stationary_ && imu_motion_detector_stationary_) {
-    std::cout << "IMU determined stationary, adding prior at time "
-              << frame_bundle->at(0)->getTimestampSec() << std::endl;
+    VLOG(5) << "IMU determined stationary, adding prior at time "
+            << frame_bundle->at(0)->getTimestampSec() << std::endl;
     if (!backend_.addVelocityPrior(createNFrameId(frame_bundle->getBundleId()),
                                    Eigen::Matrix<FloatType, 3, 1>::Zero(), 0.005)) {
-      throw std::runtime_error("Failed to add a zero velocity prior!");
+      LOG(ERROR) << "Failed to add a zero velocity prior!";
+      CHECK(false) << "Not able to add velocity prior";
     } else {
       velocity_prior_added = true;
     }
@@ -247,25 +244,25 @@ void CeresBackendInterface::bundleAdjustment(const FrameBundlePtr& frame_bundle)
       }
     }
   }
-  std::cout << "Backend: Added " << num_new_observations
-            << " continued observation in non-KF to backend.";
+  VLOG(10) << "Backend: Added " << num_new_observations
+           << " continued observation in non-KF to backend.";
 
   if (options_.skip_optimization_when_tracking_bad) {
     if (frame_bundle->numLandmarksInBA() < options_.min_added_measurements) {
-      std::cout << "Too few visual measurements, skip optimization once.";
+      LOG(WARNING) << "Too few visual measurements, skip optimization once.";
       skip_optimization_once_ = true;
     }
   }
 
   if (velocity_prior_added) {
-    std::cout << "Velocity prior added, not skipping optimization.";
+    LOG(WARNING) << "Velocity prior added, not skipping optimization.";
     skip_optimization_once_ = false;
   }
 
   if (global_landmark_value_version_ < Point::global_map_value_version_) {
     backend_.updateFixedLandmarks();
-    std::cout << "Update fixed landmarks in Ceres backend: " << global_landmark_value_version_
-              << " ==> " << Point::global_map_value_version_ << std::endl;
+    VLOG(1) << "Update fixed landmarks in Ceres backend: " << global_landmark_value_version_
+            << " ==> " << Point::global_map_value_version_ << std::endl;
     global_landmark_value_version_ = Point::global_map_value_version_;
   }
 
@@ -303,7 +300,7 @@ void CeresBackendInterface::addLandmarksAndObservationsToBackend(const FramePtr&
     if (backend_.isPointInEstimator(point->id())) {
       ++n_features_already_in_backend;
       if (!backend_.addObservation(frame, kp_idx)) {
-        std::cout << "Failed to add an observation!";
+        LOG(WARNING) << "Failed to add an observation!";
         continue;
       }
       ++n_new_observations;
@@ -322,15 +319,13 @@ void CeresBackendInterface::addLandmarksAndObservationsToBackend(const FramePtr&
       // check if we have enough observations. Might not be the case if seed
       // original frame was already dropped.
       if (point->obs_.size() < options_.min_num_obs) {
-        std::cout << "Point with less than " << options_.min_num_obs << " observations! Only have "
-                  << point->obs_.size();
+        VLOG(10) << "Point with less than " << options_.min_num_obs << " observations! Only have "
+                 << point->obs_.size();
         ++n_skipped_few_obs;
         continue;
       }
 
-      if (std::isnan(point->pos_[0])) {
-        throw std::runtime_error("Point is nan!");
-      }
+      CHECK(!std::isnan(point->pos_[0])) << "Point is nan!";
 
       //      //! @todo tune this parameter, do we need it?
       //      if(point->getTriangulationParallax() <
@@ -349,13 +344,13 @@ void CeresBackendInterface::addLandmarksAndObservationsToBackend(const FramePtr&
         continue;
       }
       if (!backend_.addLandmark(point, false)) {
-        std::cerr << "Failed to add a landmark!";
+        LOG(ERROR) << "Failed to add a landmark!";
         continue;
       }
       ++n_new_landmarks;
       // add an observation to the landmark
       if (!backend_.addObservation(frame, kp_idx)) {
-        std::cerr << "Failed to add an observation!";
+        LOG(ERROR) << "Failed to add an observation!";
         continue;
       }
       ++n_new_observations;
@@ -379,16 +374,16 @@ void CeresBackendInterface::addLandmarksAndObservationsToBackend(const FramePtr&
     }
   }
 
-  std::cout << "Backend has: " << backend_.numFixedLandmarks() << " fixed landmarks out of "
-            << backend_.numLandmarks() << std::endl;
-  std::cout << "Backend: Added " << n_new_landmarks << " new landmarks";
-  std::cout << "Backend: Added " << n_new_observations << " new observations";
-  std::cout << "Backend: Observations already in backend: " << n_features_already_in_backend;
-  std::cout << "Backend: Adding points. Skipped because less than " << options_.min_num_obs
-            << " observations: " << n_skipped_few_obs;
-  std::cout << "Backend: Adding points. Skipped because small parallax: "
-            << n_skipped_points_parallax;
-  std::cout << "Backend: Adding points. Skipped because not corner: " << n_skipped_not_corner;
+  VLOG(6) << "Backend has: " << backend_.numFixedLandmarks() << " fixed landmarks out of "
+          << backend_.numLandmarks() << std::endl;
+  VLOG(6) << "Backend: Added " << n_new_landmarks << " new landmarks";
+  VLOG(6) << "Backend: Added " << n_new_observations << " new observations";
+  VLOG(6) << "Backend: Observations already in backend: " << n_features_already_in_backend;
+  VLOG(6) << "Backend: Adding points. Skipped because less than " << options_.min_num_obs
+          << " observations: " << n_skipped_few_obs;
+  VLOG(6) << "Backend: Adding points. Skipped because small parallax: "
+          << n_skipped_points_parallax;
+  VLOG(6) << "Backend: Adding points. Skipped because not corner: " << n_skipped_not_corner;
 }
 
 // Introduce a state for the frame_bundle in backend. Add IMU terms.
@@ -406,21 +401,21 @@ bool CeresBackendInterface::addStatesAndInertialMeasurementsToBackend(
   // frame_bundle
   if (!imu_handler_->getMeasurementsContainingEdges(current_frame_bundle_stamp, imu_measurements,
                                                     true)) {
-    std::cerr << "Could not retrieve IMU measurements."
-              << " Last frame was at " << last_added_frame_stamp_ns_ << ", current is at "
-              << frame_bundle->getMinTimestampNanoseconds();
+    LOG(ERROR) << "Could not retrieve IMU measurements."
+               << " Last frame was at " << last_added_frame_stamp_ns_ << ", current is at "
+               << frame_bundle->getMinTimestampNanoseconds();
     return false;
   }
 
   // introduce a state for the frame in the backend --------------------------
   if (!backend_.addStates(frame_bundle, imu_measurements, current_frame_bundle_stamp)) {
-    std::cerr << "Failed to add state. Will drop frames.";
+    LOG(ERROR) << "Failed to add state. Will drop frames.";
     return false;
   }
 
-  std::cout << "Backend: Added " << imu_measurements.size()
-            << " inertial "
-               "measurements.";
+  VLOG(10) << "Backend: Added " << imu_measurements.size()
+           << " inertial "
+              "measurements.";
   return true;
 }
 
@@ -429,18 +424,13 @@ void CeresBackendInterface::updateFrameStateWithBackend(const FramePtr& f,
   Transformation T_WS;
   bool success = backend_.get_T_WS(f->bundleId(), T_WS);
   T_WS.getRotation().normalize();
-  if (!success) {
-    throw std::runtime_error("Could not get state for frame bundle " +
-                             std::to_string(f->bundleId()) + " from backend");
-  }
+  CHECK(success) << "Could not get state for frame bundle " << f->bundleId() << " from backend";
   f->set_T_w_imu(T_WS);
   if (get_speed_bias) {
     SpeedAndBias speed_bias;
     success = backend_.getSpeedAndBias(f->bundleId(), speed_bias);
-    if (!success) {
-      throw std::runtime_error("Could not get speed/bias for frame bundle " +
-                               std::to_string(f->bundleId()) + " from backend");
-    }
+    CHECK(success) << "Could not get speed/bias for frame bundle " << f->bundleId()
+                   << " from backend";
     f->setIMUState(T_WS.getRotation().rotate(speed_bias.block<3, 1>(0, 0)),
                    speed_bias.block<3, 1>(3, 0), speed_bias.block<3, 1>(6, 0));
   }
@@ -450,46 +440,40 @@ void CeresBackendInterface::updateBundleStateWithBackend(const FrameBundlePtr& f
                                                          const bool get_speed_bias) {
   Transformation T_WS;
   bool success = backend_.get_T_WS(frames->getBundleId(), T_WS);
-  if (!success) {
-    throw std::runtime_error("Could not get state for frame bundle " +
-                             std::to_string(frames->getBundleId()) + " from backend");
-  }
+  CHECK(success) << "Could not get state for frame bundle " << frames->getBundleId()
+                 << " from backend";
   frames->set_T_W_B(T_WS);
 
   if (get_speed_bias) {
     SpeedAndBias speed_bias;
     success = backend_.getSpeedAndBias(frames->getBundleId(), speed_bias);
-    if (!success) {
-      throw std::runtime_error("Could not get speed/bias for frame bundle " +
-                               std::to_string(frames->getBundleId()) + " from backend");
-    }
+    CHECK(success) << "Could not get speed/bias for frame bundle " << frames->getBundleId()
+                   << " from backend";
     frames->setIMUState(T_WS.getRotation().rotate(speed_bias.block<3, 1>(0, 0)),
                         speed_bias.block<3, 1>(3, 0), speed_bias.block<3, 1>(6, 0));
   }
 }
 void CeresBackendInterface::reset() {
-  std::cout << "Backend: Reset";
+  VLOG(1) << "Backend: Reset";
   //! @todo implement!
-  std::cerr << "Resetting ceres backend not implemented";
+  LOG(ERROR) << "Resetting ceres backend not implemented";
 }
 
 void CeresBackendInterface::startThread() {
-  if (thread_) {
-    throw std::runtime_error("Tried to start thread that is already running!");
-  }
+  CHECK(thread_ == nullptr) << "Tried to start thread that is already running!";
   stop_thread_ = false;
   thread_.reset(new std::thread(&CeresBackendInterface::optimizationLoop, this));
 }
 
 void CeresBackendInterface::quitThread() {
-  std::cout << "Interrupting and stopping optimization thread.";
+  VLOG(1) << "Interrupting and stopping optimization thread.";
   stop_thread_ = true;
   if (thread_ != nullptr) {
     wait_condition_.notify_all();
     thread_->join();
     thread_.reset();
   }
-  std::cout << "Thread stopped and joined.";
+  VLOG(1) << "Thread stopped and joined.";
 }
 
 // Performance monitor for benchmarking
@@ -509,7 +493,7 @@ void CeresBackendInterface::setPerformanceMonitor(const std::string& trace_dir) 
 }
 
 void CeresBackendInterface::optimizationLoop() {
-  std::cout << "Backend: Optimization thread started.";
+  VLOG(1) << "Backend: Optimization thread started.";
   while (!stop_thread_) {
     {
       std::unique_lock<std::mutex> lock(mutex_backend_);
@@ -546,7 +530,7 @@ void CeresBackendInterface::optimizationLoop() {
         if (!backend_.applyMarginalizationStrategy(optimizer_options_.num_keyframes,
                                                    optimizer_options_.num_imu_frames + 1,
                                                    &mag_timing)) {
-          std::cerr << "Marginalization failed!";
+          LOG(ERROR) << "Marginalization failed!";
         }
         updateActiveKeyframes();
       }
@@ -601,14 +585,12 @@ void CeresBackendInterface::optimizationLoop() {
       // Publish pose and visualize makers
       Transformation T_WS;
       bool success = backend_.get_T_WS(last_optimized_nframe_.load(), T_WS);
-      if (!success) {
-        throw std::runtime_error("Could not get latest Transformation from ceres optimizer");
-      }
+      CHECK(success) << "Could not get latest Transformation from ceres "
+                        "optimizer";
       SpeedAndBias speed_and_bias;
       success = backend_.getSpeedAndBias(last_optimized_nframe_, speed_and_bias);
-      if (!success) {
-        throw std::runtime_error("Could not get latest speed/bias from ceres optimizer");
-      }
+      CHECK(success) << "Could not get latest speed/bias from ceres "
+                        "optimizer";
       last_state_.set_T_W_B(T_WS);
       last_state_.set_W_v_B(speed_and_bias.head<3>());
       last_state_.setAccBias(speed_and_bias.tail<3>());
@@ -621,7 +603,7 @@ void CeresBackendInterface::optimizationLoop() {
     }  // release backend mutex.
   }
 
-  std::cout << "Optimization thread ended.";
+  VLOG(1) << "Optimization thread ended.";
 }
 
 // Set the IMU and the parameters in backend
@@ -654,9 +636,7 @@ void CeresBackendInterface::setCorrectionInWorld(const Transformation& w_T_corre
 }
 
 void CeresBackendInterface::getAllActiveKeyframes(std::vector<FramePtr>* keyframes) {
-  if (!keyframes) {
-    throw std::runtime_error("CeresBackendInterface::getAllActiveKeyframes: keyframes is nullptr");
-  }
+  CHECK_NOTNULL(keyframes);
   keyframes->clear();
   keyframes->insert(keyframes->begin(), active_keyframes_.begin(), active_keyframes_.end());
 }
@@ -675,7 +655,7 @@ void CeresBackendInterface::updateActiveKeyframes() {
     if (oldest_keyframe_in_backend == active_keyframes_.front()->bundleId()) {
       return;
     }
-    std::cout << "Backend: marginalized frame with id " << active_keyframes_.front()->id();
+    VLOG(40) << "Backend: marginalized frame with id " << active_keyframes_.front()->id();
     active_keyframes_.pop_front();
   }
 }

@@ -61,12 +61,10 @@ ImuError::ImuError(const ImuMeasurements& imu_measurements, const ImuParameters&
   setT0(t_0 - imu_parameters.delay_imu_cam);
   setT1(t_1 - imu_parameters.delay_imu_cam);
 
-  if (t0_ < imu_measurements.back().timestamp_) {
-    throw std::runtime_error("First IMU measurement included in ImuError is not old enough!");
-  }
-  if (t1_ > imu_measurements.front().timestamp_) {
-    throw std::runtime_error("Last IMU measurement included in ImuError is not new enough!");
-  }
+  CHECK(t0_ >= imu_measurements.back().timestamp_)
+      << "First IMU measurement included in ImuError is not old enough!";
+  CHECK(t1_ <= imu_measurements.front().timestamp_)
+      << "Last IMU measurement included in ImuError is not new enough!";
 }
 
 // Propagates pose, speeds and biases with given IMU measurements.
@@ -152,7 +150,7 @@ int ImuError::redoPreintegration(const Transformation& /*T_WS*/,
         std::abs(omega_S_1[1]) > imu_parameters_.g_max ||
         std::abs(omega_S_1[2]) > imu_parameters_.g_max) {
       sigma_g_c *= 100;
-      std::cout << "gyr saturation";
+      LOG(WARNING) << "gyr saturation";
     }
 
     if (std::abs(acc_S_0[0]) > imu_parameters_.a_max ||
@@ -162,7 +160,7 @@ int ImuError::redoPreintegration(const Transformation& /*T_WS*/,
         std::abs(acc_S_1[1]) > imu_parameters_.a_max ||
         std::abs(acc_S_1[2]) > imu_parameters_.a_max) {
       sigma_a_c *= 100;
-      std::cout << "acc saturation";
+      LOG(WARNING) << "acc saturation";
     }
 
     // actual propagation
@@ -347,14 +345,14 @@ int ImuError::propagation(const ImuMeasurements& imu_measurements, const ImuPara
         std::abs(omega_S_0[2]) > imu_params.g_max || std::abs(omega_S_1[0]) > imu_params.g_max ||
         std::abs(omega_S_1[1]) > imu_params.g_max || std::abs(omega_S_1[2]) > imu_params.g_max) {
       sigma_g_c *= 100;
-      std::cout << "gyr saturation";
+      LOG(WARNING) << "gyr saturation";
     }
 
     if (std::abs(acc_S_0[0]) > imu_params.a_max || std::abs(acc_S_0[1]) > imu_params.a_max ||
         std::abs(acc_S_0[2]) > imu_params.a_max || std::abs(acc_S_1[0]) > imu_params.a_max ||
         std::abs(acc_S_1[1]) > imu_params.a_max || std::abs(acc_S_1[2]) > imu_params.a_max) {
       sigma_a_c *= 100;
-      std::cout << "acc saturation";
+      LOG(WARNING) << "acc saturation";
     }
 
     // actual propagation

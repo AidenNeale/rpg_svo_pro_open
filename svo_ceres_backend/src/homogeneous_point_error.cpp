@@ -85,7 +85,7 @@ bool HomogeneousPointError::EvaluateWithMinimalJacobians(double const* const* pa
   Eigen::Vector3d error;
   HomogeneousPointLocalParameterization::minus(&measurement_[0], &parameters[0][0], &error[0]);
 
-  // std::cout <<hp.toHomogeneous().transpose() << " : " << measurement.transpose() << std::endl;
+  // LOG(INFO)<<hp.toHomogeneous().transpose() << " : " << measurement.transpose();
 
   // weigh it
   Eigen::Map<Eigen::Vector3d> weighted_error(residuals);

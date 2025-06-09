@@ -87,10 +87,7 @@ class ReprojectionError : public ReprojectionErrorBase {
   /// \brief Set the underlying camera model.
   /// @param[in] cameraGeometry The camera geometry.
   void setCameraGeometry(CameraConstPtr camera_geometry) {
-    if (!camera_geometry) {
-      throw std::invalid_argument(
-          "Camera geometry pointer is null. Please provide a valid camera geometry.");
-    }
+    CHECK(camera_geometry != nullptr);
     camera_geometry_ = camera_geometry;
   }
 

@@ -78,20 +78,14 @@ Estimator::Estimator(std::shared_ptr<ceres_backend::Map> map_ptr)
 // The default constructor.
 Estimator::Estimator() : Estimator(std::make_shared<ceres_backend::Map>()) {}
 
-Estimator::~Estimator() { std::cout << "Estimator destructor called" << std::endl; }
+Estimator::~Estimator() {}
 
 // Add a camera to the configuration. Sensors can only be added and never removed.
 void Estimator::addCameraBundle(
     const ExtrinsicsEstimationParametersVec& extrinsics_estimation_parameters,
     const CameraBundlePtr camera_rig) {
-  if (!camera_rig) {
-    throw std::invalid_argument("Camera rig pointer is null. Please provide a valid camera rig.");
-  }
-  if (camera_rig->getNumCameras() != extrinsics_estimation_parameters.size()) {
-    throw std::invalid_argument(
-        "Number of cameras in the camera rig does not match the number of "
-        "extrinsics estimation parameters provided.");
-  }
+  CHECK(camera_rig != nullptr);
+  CHECK_EQ(camera_rig->getNumCameras(), extrinsics_estimation_parameters.size());
   extrinsics_estimation_parameters_ = extrinsics_estimation_parameters;
   camera_rig_ = camera_rig;
   constant_extrinsics_ids_.resize(camera_rig_->getNumCameras());
@@ -103,9 +97,8 @@ void Estimator::addCameraBundle(
       //! cameras we estimate the temporal changes of the extrinsics and for
       //! others we do not.
       estimate_temporal_extrinsics_ = true;
-      throw std::runtime_error(
-          "Estimating temporal changes of extrinsics seems to cause jumps in the estimations. Not "
-          "supported at this moment.");
+      LOG(FATAL) << "Estimating temporal changes of extrinsics seems to cause"
+                    " jumps in the estimations. Not supported at this moment.";
     }
   }
 }
@@ -113,7 +106,7 @@ void Estimator::addCameraBundle(
 // Add an IMU to the configuration.
 int Estimator::addImu(const ImuParameters& imu_parameters) {
   if (imu_parameters_.size() > 1) {
-    std::cerr << "only one IMU currently supported";
+    LOG(ERROR) << "only one IMU currently supported";
     return -1;
   }
   imu_parameters_.push_back(imu_parameters);
@@ -130,9 +123,9 @@ void Estimator::clearImus() { imu_parameters_.clear(); }
 bool Estimator::addStates(const FrameBundleConstPtr& frame_bundle,
                           const ImuMeasurements& imu_measurements, const double& timestamp) {
   BackendId nframe_id = createNFrameId(frame_bundle->getBundleId());
-  std::cout << "Adding state to estimator. Bundle ID: " << frame_bundle->getBundleId()
-            << " with backend-id: " << std::hex << nframe_id << std::dec
-            << " num IMU measurements: " << imu_measurements.size();
+  VLOG(20) << "Adding state to estimator. Bundle ID: " << frame_bundle->getBundleId()
+           << " with backend-id: " << std::hex << nframe_id << std::dec
+           << " num IMU measurements: " << imu_measurements.size();
 
   double last_timestamp = 0;
   Transformation T_WS;
@@ -146,18 +139,16 @@ bool Estimator::addStates(const FrameBundleConstPtr& frame_bundle,
       T_WS = reinit_T_WS_;
       int num_used_imu_measurements = ceres_backend::ImuError::propagation(
           imu_measurements, imu_parameters_.at(0), T_WS, speed_and_bias, last_timestamp, timestamp);
-      if (num_used_imu_measurements <= 1) {
-        throw std::runtime_error(
-            "No imu measurements is used for reinitialization. Something wrong with the IMU "
-            "bookkeeping.");
-      }
+      CHECK_GT(num_used_imu_measurements, 1) << "No imu measurements is used for reinitialization."
+                                                " Something wrong with the IMU bookkeeping.";
       T_WS.getRotation().normalize();
       is_reinit_ = false;
     } else {
       // in case this is the first frame ever, let's initialize the pose:
       bool success0 = initPoseFromImu(imu_measurements, T_WS);
+      CHECK(success0) << "pose could not be initialized from imu measurements.";
       if (!success0) {
-        throw std::runtime_error("Pose could not be initialized from IMU measurements.");
+        return false;
       }
       speed_and_bias.setZero();
       speed_and_bias.segment<3>(6) = imu_parameters_.at(0).a0;
@@ -180,17 +171,15 @@ bool Estimator::addStates(const FrameBundleConstPtr& frame_bundle,
         nullptr, nullptr);
     T_WS.getRotation().normalize();
     //! @todo could check this sooner if we select IMU measurements as we do
-    //    DEBUG_CHECK(num_used_imu_measurements > 1) << "propagation failed";
+    //    CHECK(num_used_imu_measurements > 1) << "propagation failed";
     if (num_used_imu_measurements < 1) {
-      std::cerr << "numUsedImuMeasurements=" << num_used_imu_measurements;
+      LOG(ERROR) << "numUsedImuMeasurements=" << num_used_imu_measurements;
       return false;
     }
   }
 
   // check if id was used before
-  if (states_.findSlot(nframe_id).second) {
-    throw std::runtime_error("pose ID" + nframe_id.toString() + " was used before!");
-  }
+  CHECK(!states_.findSlot(nframe_id).second) << "pose ID" << nframe_id << " was used before!";
 
   // add the pose states
   std::shared_ptr<ceres_backend::PoseParameterBlock> pose_parameter_block =
@@ -210,10 +199,7 @@ bool Estimator::addStates(const FrameBundleConstPtr& frame_bundle,
   }
 
   // Now we deal with error terms
-  if (states_.ids.size() < 1u) {
-    throw std::runtime_error(
-        "There should be at least one state in the estimator before adding a new one.");
-  }
+  CHECK_GE(states_.ids.size(), 1u);
 
   // add initial prior or IMU errors
   if (states_.ids.size() == 1) {
@@ -332,9 +318,7 @@ bool Estimator::addLandmark(const PointPtr& landmark, const bool set_fixed) {
 
   // add landmark to map
   landmarks_map_.emplace_hint(landmarks_map_.end(), landmark_backend_id, MapPoint(landmark));
-  if (!isLandmarkAdded(landmark_backend_id)) {
-    throw std::runtime_error("Bug: Inconsistend landmarkdMap_ with mapPtr_.");
-  }
+  CHECK(isLandmarkAdded(landmark_backend_id)) << "bug: inconsistend landmarkdMap_ with mapPtr_.";
   landmark->in_ba_graph_ = true;
 
   // fixation
@@ -347,10 +331,7 @@ bool Estimator::addLandmark(const PointPtr& landmark, const bool set_fixed) {
 
 // Add a high prior to a landmarks position
 bool Estimator::setLandmarkConstant(const BackendId& landmark_backend_id) {
-  if (landmark_backend_id.type() != IdType::Landmark) {
-    throw std::runtime_error("setLandmarkConstant called with a non-landmark BackendId: " +
-                             landmark_backend_id.toString());
-  }
+  CHECK(landmark_backend_id.type() == IdType::Landmark);
   map_ptr_->setParameterBlockConstant(landmark_backend_id.asInteger());
   landmarks_map_[landmark_backend_id].fixed_position = true;
 
@@ -386,7 +367,7 @@ void Estimator::removeAllFixedLandmarks() {
 }
 
 size_t Estimator::numValidFixedLandmarks() const {
-  throw std::runtime_error("NOT TESTED!!");
+  LOG(FATAL) << "NOT TESTED!!";
   size_t cnt = 0;
   for (const uint64_t param_id : fixed_landmark_parameter_ids_) {
     ceres_backend::Map::ResidualBlockCollection residuals =
@@ -425,12 +406,9 @@ void Estimator::setAllFixedLandmarksEnabled(const bool enabled) {
         continue;
       }
 
-      throw std::runtime_error("Should not reach here.");
+      LOG(FATAL) << "Should not reach here.";
     }
-    if (n_proj <= 0u) {
-      throw std::runtime_error("No reprojection error found for landmark with id: " +
-                               BackendId(param_id).toString());
-    }
+    CHECK_GT(n_proj, 0u);
   }
 }
 
@@ -444,9 +422,7 @@ void Estimator::updateFixedLandmarks() {
     std::shared_ptr<ceres_backend::HomogeneousPointParameterBlock> pt_ptr =
         std::static_pointer_cast<ceres_backend::HomogeneousPointParameterBlock>(
             map_ptr_->parameterBlockPtr(param_id));
-    if (!pt_ptr) {
-      throw std::runtime_error("pt_ptr is null.");
-    }
+    CHECK(pt_ptr);
     pt_ptr->setEstimate(homo_pos);
   }
 }
@@ -458,9 +434,7 @@ void Estimator::removeLandmarkByBackendId(const BackendId& bid, const bool check
   }
 
   if (check_fixed) {
-    if (!map_ptr_->isParameterBlockConstant(bid.asInteger())) {
-      throw std::runtime_error("Parameter block is not constant.");
-    }
+    CHECK(map_ptr_->isParameterBlockConstant(bid.asInteger()));
   }
 
   map_ptr_->removeParameterBlock(bid.asInteger());
@@ -470,9 +444,7 @@ void Estimator::removeLandmarkByBackendId(const BackendId& bid, const bool check
 
 bool Estimator::addVelocityPrior(BackendId nframe_id, const Eigen::Vector3d& velocity,
                                  double sigma) {
-  if (!states_.findSlot(nframe_id).second) {
-    throw std::runtime_error("addVelocityPrior: Cannot find state.");
-  }
+  CHECK(states_.findSlot(nframe_id).second);
   SpeedAndBias speed_and_bias;
   speed_and_bias.head<3>() = velocity;
   speed_and_bias.tail<6>().setZero();
@@ -499,10 +471,7 @@ bool Estimator::removeObservation(ceres::ResidualBlockId residual_block_id) {
   const ceres_backend::Map::ParameterBlockCollection parameters =
       map_ptr_->parameters(residual_block_id);
   const BackendId landmarkId(parameters.at(1).first);
-  if (landmarkId.type() != IdType::Landmark) {
-    throw std::runtime_error("removeObservation called with a non-landmark BackendId: " +
-                             landmarkId.toString());
-  }
+  CHECK(landmarkId.type() == IdType::Landmark);
   // remove in landmarksMap
   MapPoint& map_point = landmarks_map_.at(landmarkId);
   for (auto it = map_point.observations.begin(); it != map_point.observations.end();) {
@@ -560,10 +529,9 @@ bool Estimator::applyMarginalizationStrategy(size_t num_keyframes, size_t num_im
   // remove linear marginalizationError, if existing
   if (marginalization_error_ptr_ && marginalization_residual_id_) {
     bool success = map_ptr_->removeResidualBlock(marginalization_residual_id_);
-    if (!success) {
-      throw std::runtime_error("could not remove marginalization error");
-    }
+    CHECK(success) << "could not remove marginalization error";
     marginalization_residual_id_ = 0;
+    if (!success) return false;
   }
 
   // these will keep track of what we want to marginalize out.
@@ -678,9 +646,7 @@ bool Estimator::applyMarginalizationStrategy(size_t num_keyframes, size_t num_im
     }
 
     // now finally we trmarginalize_pose_framesbservations.
-    if (all_linearized_frames.size() <= 0) {
-      throw std::runtime_error("bug");
-    }
+    CHECK(all_linearized_frames.size() > 0) << "bug";
     // this is the id of the oldest frame in the sliding window
     const BackendId current_kf_id = all_linearized_frames.at(0);
     // If the frame dropping out of the sliding window is not a keyframe, then
@@ -690,9 +656,7 @@ bool Estimator::applyMarginalizationStrategy(size_t num_keyframes, size_t num_im
       for (PointMap::iterator pit = landmarks_map_.begin(); pit != landmarks_map_.end();) {
         ceres_backend::Map::ResidualBlockCollection residuals =
             map_ptr_->residuals(pit->first.asInteger());
-        if (residuals.size() == 0) {
-          throw std::runtime_error("Landmark has no residuals, but is still in the map.");
-        }
+        CHECK(residuals.size() != 0);
 
         // dealing with fixed landmarks: just delete corresponding residuals
         if (pit->second.fixed_position) {
@@ -811,7 +775,7 @@ bool Estimator::applyMarginalizationStrategy(size_t num_keyframes, size_t num_im
 
     // update book-keeping and go to the next frame
     // if(it != statesMap_.begin()){ // let's remember that we kept the very first pose
-    std::cout << "Marginalizing out state with id " << marginalize_pose_frames[k];
+    VLOG(20) << "Marginalizing out state with id " << marginalize_pose_frames[k];
     states_.removeState(marginalize_pose_frames[k]);
   }
   if (timing) {
@@ -827,7 +791,7 @@ bool Estimator::applyMarginalizationStrategy(size_t num_keyframes, size_t num_im
       for (uint64_t id : parameter_blocks_to_be_marginalized) {
         s << BackendId(id) << "\n";
       }
-      std::cout << s.str();
+      VLOG(20) << s.str();
     }
 
     // clean parameter blocks --> some get lost in marginalization term during
@@ -835,7 +799,7 @@ bool Estimator::applyMarginalizationStrategy(size_t num_keyframes, size_t num_im
     for (std::vector<uint64_t>::iterator it = parameter_blocks_to_be_marginalized.begin();
          it != parameter_blocks_to_be_marginalized.end();) {
       if (!marginalization_error_ptr_->isInMarginalizationTerm(*it)) {
-        std::cout << "removing block with id " << *it;
+        VLOG(20) << "removing block with id " << *it;
         it = parameter_blocks_to_be_marginalized.erase(it);
         keep_parameter_blocks.pop_back();  // this only works because all false
         // proper way:
@@ -873,8 +837,9 @@ bool Estimator::applyMarginalizationStrategy(size_t num_keyframes, size_t num_im
     marginalization_error_ptr_->getParameterBlockPtrs(parameter_block_ptrs);
     marginalization_residual_id_ =
         map_ptr_->addResidualBlock(marginalization_error_ptr_, nullptr, parameter_block_ptrs);
+    CHECK(marginalization_residual_id_) << "could not add marginalization error";
     if (!marginalization_residual_id_) {
-      throw std::runtime_error("Could not add marginalization error");
+      return false;
     }
   }
 
@@ -965,21 +930,25 @@ void Estimator::optimize(size_t num_iter, size_t /*num_threads*/,
                          bool verbose)  // avoid warning since numThreads unused
 #warning openmp not detected, your system may be slower than expected
 #endif
-{
 
+{
   // DEBUG
-  // std::cout << "printing all parameters";
-  // const std::unordered_map<uint64_t, std::shared_ptr<ceres_backend::ParameterBlock> >& idmap =
-  //     map_ptr_->idToParameterBlockMap();
-  // for (auto& it : idmap) {
-  //   if (it.second->typeInfo() != "HomogeneousPointParameterBlock") {
-  //     map_ptr_->printParameterBlockInfo(it.first);
-  //     const double* params = it.second->parameters();
-  //     for (size_t i = 0; i < it.second->dimension(); ++i) {
-  //       std::cerr << params[i] << std::endl;
+  //   LOG(ERROR) << "printing all parameters";
+  //   const std::unordered_map<uint64_t,
+  //         std::shared_ptr<ceres_backend::ParameterBlock> > &idmap =
+  //         map_ptr_->idToParameterBlockMap();
+  //   for(auto &it : idmap)
+  //   {
+  //     if(it.second->typeInfo()!="HomogeneousPointParameterBlock")
+  //     {
+  //       map_ptr_->printParameterBlockInfo(it.first);
+  //       const double* params = it.second->parameters();
+  //       for(size_t i = 0; i<it.second->dimension(); ++i)
+  //       {
+  //         LOG(ERROR) << params[i];
+  //       }
   //     }
   //   }
-  // }
   //  assemble options
   //  map_ptr_->options.linear_solver_type = ceres::SPARSE_SCHUR;
   map_ptr_->options.linear_solver_type = ceres::DENSE_SCHUR;
@@ -1019,7 +988,7 @@ void Estimator::optimize(size_t num_iter, size_t /*num_threads*/,
   }
 
   //  //DEBUG
-  //  std::cout << "after optimization" << std::endl;
+  //  LOG(ERROR) << "after optimization"
   //  for(auto &it : idmap)
   //  {
   //    if(it.second->typeInfo()!="HomogeneousPointParameterBlock")
@@ -1028,18 +997,18 @@ void Estimator::optimize(size_t num_iter, size_t /*num_threads*/,
   //      const double* params = it.second->parameters();
   //      for(size_t i = 0; i<it.second->dimension(); ++i)
   //      {
-  //        std::cout << params[i] << std::endl;
+  //        LOG(ERROR) << params[i];
   //      }
   //    }
   //  }
   // summary output
   if (verbose) {
-    std::cout << map_ptr_->summary.FullReport();
+    LOG(INFO) << map_ptr_->summary.FullReport();
     std::stringstream s;
     for (const auto& id : states_.ids) {
       printStates(id, s);
     }
-    std::cout << s.str();
+    LOG(INFO) << s.str();
   }
 }
 
@@ -1068,7 +1037,8 @@ bool Estimator::setOptimizationTimeLimit(double time_limit, int min_iterations) 
 // Get a specific landmark.
 bool Estimator::getLandmark(BackendId landmark_id, MapPoint& map_point) const {
   if (landmarks_map_.find(landmark_id) == landmarks_map_.end()) {
-    throw std::runtime_error("Landmark does not exist.");
+    CHECK(false) << "landmark with id = " << landmark_id << " does not exist.";
+    return false;
   }
   map_point = landmarks_map_.at(landmark_id);
   return true;
@@ -1086,9 +1056,7 @@ void Estimator::updateAllActivePoints() const {
 
 // Checks whether the landmark is initialized.
 bool Estimator::isLandmarkInitialized(BackendId landmark_id) const {
-  if (!isLandmarkAdded(landmark_id)) {
-    throw std::runtime_error("Landmark not added");
-  }
+  CHECK(isLandmarkAdded(landmark_id)) << "landmark not added";
   return std::static_pointer_cast<ceres_backend::HomogeneousPointParameterBlock>(
              map_ptr_->parameterBlockPtr(landmark_id.asInteger()))
       ->initialized();
@@ -1113,9 +1081,7 @@ size_t Estimator::getLandmarks(MapPointVector& landmarks) const {
 
 // Get pose for a given backend ID.
 bool Estimator::get_T_WS(BackendId id, Transformation& T_WS) const {
-  if (id.type() != IdType::NFrame) {
-    throw std::runtime_error("wrong id type");
-  }
+  CHECK(id.type() == IdType::NFrame) << "wrong id type: id = " << id;
   bool success;
   std::tie(T_WS, success) = getPoseEstimate(id);
   return success;
@@ -1150,7 +1116,8 @@ BackendId Estimator::currentKeyframeId() const {
       return states_.ids[i];
     }
   }
-  throw std::runtime_error("No keyframes in the state.");
+  CHECK(false) << "no existing keyframes ...";
+  return BackendId();
 }
 
 // Get the ID of the current keyframe.
@@ -1165,17 +1132,13 @@ BundleId Estimator::oldestKeyframeBundleId() const {
 
 // Get the ID of an older frame.
 BackendId Estimator::frameIdByAge(size_t age) const {
-  if (age >= numFrames()) {
-    throw std::runtime_error("Requested age " + std::to_string(age) + " out of range.");
-  }
+  CHECK(age < numFrames()) << "requested age " << age << " out of range.";
   return states_.ids[numFrames() - 1 - age];
 }
 
 // Get the ID of the newest frame added to the state.
 BackendId Estimator::currentFrameId() const {
-  if (states_.ids.size() <= 0) {
-    throw std::runtime_error("No frames added yet.");
-  }
+  CHECK(states_.ids.size() > 0) << "no frames added yet.";
   return states_.ids.back();
 }
 
@@ -1188,17 +1151,13 @@ bool Estimator::isInImuWindow(BackendId nframe_id) const {
 
 // Set pose for a given pose ID.
 bool Estimator::set_T_WS(BackendId pose_id, const Transformation& T_WS) {
-  if (pose_id.type() != IdType::NFrame) {
-    throw std::runtime_error("set_T_WS:: wrong id type");
-  }
+  CHECK(pose_id.type() == IdType::NFrame);
   return setPoseEstimate(pose_id, T_WS);
 }
 
 // Set position for a given landmark.
 bool Estimator::setLandmarkPosition(BackendId landmark_id, const Position& landmark_pos) {
-  if (landmark_id.type() != IdType::Landmark) {
-    throw std::runtime_error("setLandmarkPosition:: wrong id type");
-  }
+  CHECK(landmark_id.type() == IdType::Landmark);
   if (!map_ptr_->parameterBlockExists(landmark_id.asInteger())) {
     return false;
   }
@@ -1213,9 +1172,7 @@ bool Estimator::setLandmarkPosition(BackendId landmark_id, const Position& landm
 
 // Set the speeds and IMU biases for a given pose ID.
 bool Estimator::setSpeedAndBiasFromNFrameId(BackendId pose_id, const SpeedAndBias& speed_and_bias) {
-  if (pose_id.type() != IdType::NFrame) {
-    throw std::runtime_error("setSpeedAndBiasFromNFrameId:: wrong id type");
-  }
+  CHECK(pose_id.type() == IdType::NFrame);
   BackendId sab_id = changeIdType(pose_id, IdType::ImuStates);
   return setSpeedAndBiasEstimate(sab_id, speed_and_bias);
 }
@@ -1223,18 +1180,14 @@ bool Estimator::setSpeedAndBiasFromNFrameId(BackendId pose_id, const SpeedAndBia
 // Set the transformation from sensor to camera frame for a given pose ID.
 bool Estimator::setCameraSensorStates(BackendId pose_id, uint8_t camera_idx,
                                       const Transformation& T_SCi) {
-  if (pose_id.type() != IdType::NFrame) {
-    throw std::runtime_error("setCameraSensorStates:: wrong id type");
-  }
+  CHECK(pose_id.type() == IdType::NFrame);
   BackendId extrinsics_id = changeIdType(pose_id, IdType::Extrinsics, camera_idx);
   return setPoseEstimate(extrinsics_id, T_SCi);
 }
 
 // Set the landmark initialization state.
 void Estimator::setLandmarkInitialized(BackendId landmark_id, bool initialized) {
-  if (!isLandmarkAdded(landmark_id)) {
-    throw std::runtime_error("Landmark not added");
-  }
+  CHECK(isLandmarkAdded(landmark_id)) << "landmark not added";
   std::static_pointer_cast<ceres_backend::HomogeneousPointParameterBlock>(
       map_ptr_->parameterBlockPtr(landmark_id.asInteger()))
       ->setInitialized(initialized);
@@ -1244,9 +1197,7 @@ void Estimator::setLandmarkInitialized(BackendId landmark_id, bool initialized) 
 // getters
 
 std::pair<Transformation, bool> Estimator::getPoseEstimate(BackendId id) const {
-  if (id.type() != IdType::NFrame && id.type() != IdType::Extrinsics) {
-    throw std::runtime_error("getPoseEstimate:: wrong id type");
-  }
+  CHECK(id.type() == IdType::NFrame || id.type() == IdType::Extrinsics);
   if (!map_ptr_->parameterBlockExists(id.asInteger())) {
     return std::make_pair(Transformation(), false);
   }
@@ -1256,9 +1207,7 @@ std::pair<Transformation, bool> Estimator::getPoseEstimate(BackendId id) const {
   if (base_ptr != nullptr) {
     std::shared_ptr<ceres_backend::PoseParameterBlock> block_ptr =
         std::dynamic_pointer_cast<ceres_backend::PoseParameterBlock>(base_ptr);
-    if (!block_ptr) {
-      throw std::runtime_error("Incorrect pointer cast detected!");
-    }
+    CHECK(block_ptr != nullptr) << "Incorrect pointer cast detected!";
     return std::make_pair(block_ptr->estimate(), true);
   }
 #else
@@ -1273,9 +1222,7 @@ std::pair<Transformation, bool> Estimator::getPoseEstimate(BackendId id) const {
 }
 
 std::pair<SpeedAndBias, bool> Estimator::getSpeedAndBiasEstimate(BackendId id) const {
-  if (id.type() != IdType::ImuStates) {
-    throw std::runtime_error("getSpeedAndBiasEstimate:: wrong id type");
-  }
+  CHECK(id.type() == IdType::ImuStates);
   if (!map_ptr_->parameterBlockExists(id.asInteger())) {
     return std::make_pair(SpeedAndBias(), false);
   }
@@ -1285,9 +1232,7 @@ std::pair<SpeedAndBias, bool> Estimator::getSpeedAndBiasEstimate(BackendId id) c
   if (base_ptr != nullptr) {
     std::shared_ptr<ceres_backend::SpeedAndBiasParameterBlock> block_ptr =
         std::dynamic_pointer_cast<ceres_backend::SpeedAndBiasParameterBlock>(base_ptr);
-    if (!block_ptr) {
-      throw std::runtime_error("Incorrect pointer cast detected!");
-    }
+    CHECK(block_ptr != nullptr) << "Incorrect pointer cast detected!";
     return std::make_pair(block_ptr->estimate(), true);
   }
 #else
@@ -1306,9 +1251,7 @@ bool Estimator::setPoseEstimate(BackendId id, const Transformation& pose) {
     return false;
   }
 
-  if (id.type() != IdType::NFrame || id.type() != IdType::Extrinsics) {
-    throw std::runtime_error("setPoseEstimate:: wrong id type");
-  }
+  CHECK(id.type() == IdType::NFrame || id.type() == IdType::Extrinsics);
 #ifndef NDEBUG
   std::shared_ptr<ceres_backend::ParameterBlock> base_ptr =
       map_ptr_->parameterBlockPtr(id.asInteger());
@@ -1317,9 +1260,7 @@ bool Estimator::setPoseEstimate(BackendId id, const Transformation& pose) {
   }
   std::shared_ptr<ceres_backend::PoseParameterBlock> block_ptr =
       std::dynamic_pointer_cast<ceres_backend::PoseParameterBlock>(base_ptr);
-  if (!base_ptr) {
-    throw std::runtime_error("Incorrect pointer cast detected!");
-  }
+  CHECK(base_ptr != nullptr) << "Incorrect pointer cast detected!";
   block_ptr->setEstimate(pose);
 #else
   std::shared_ptr<ceres_backend::PoseParameterBlock> block_ptr =
@@ -1331,9 +1272,7 @@ bool Estimator::setPoseEstimate(BackendId id, const Transformation& pose) {
 }
 
 bool Estimator::setSpeedAndBiasEstimate(BackendId id, const SpeedAndBias& sab) {
-  if (id.type() != IdType::ImuStates) {
-    throw std::runtime_error("setSpeedAndBiasEstimate:: wrong id type");
-  }
+  CHECK(id.type() == IdType::ImuStates);
   if (!map_ptr_->parameterBlockExists(id.asInteger())) {
     return false;
   }
@@ -1345,9 +1284,7 @@ bool Estimator::setSpeedAndBiasEstimate(BackendId id, const SpeedAndBias& sab) {
   }
   std::shared_ptr<ceres_backend::SpeedAndBiasParameterBlock> block_ptr =
       std::dynamic_pointer_cast<ceres_backend::SpeedAndBiasParameterBlock>(base_ptr);
-  if (!block_ptr) {
-    throw std::runtime_error("Incorrect pointer cast detected!");
-  }
+  CHECK(base_ptr != nullptr) << "Incorrect pointer cast detected!";
   block_ptr->setEstimate(sab);
 #else
   std::shared_ptr<ceres_backend::SpeedAndBiasParameterBlock> block_ptr =
@@ -1376,9 +1313,9 @@ bool Estimator::removePointsByPointIds(std::vector<int>& track_ids) {
 
 bool Estimator::setFrameFixed(const BundleId& fixed_frame_bundle_id,
                               const Transformation& T_WS_new) {
-  throw std::runtime_error("This function should not be used currently.");
+  LOG(FATAL) << "This function should not be used currently.";
   BackendId new_fixed_frame = createNFrameId(fixed_frame_bundle_id);
-  std::cerr << "Setting frame fixed" << std::endl;
+  LOG(ERROR) << "Setting frame fixed";
 
   //   compute the relative transformation
   Transformation T_WS_old;
@@ -1392,9 +1329,7 @@ bool Estimator::setFrameFixed(const BundleId& fixed_frame_bundle_id,
     std::shared_ptr<ceres_backend::PoseParameterBlock> block_ptr =
         std::static_pointer_cast<ceres_backend::PoseParameterBlock>(
             map_ptr_->parameterBlockPtr(nframe_id.asInteger()));
-    if (!block_ptr) {
-      throw std::runtime_error("Incorrect pointer cast");
-    }
+    CHECK(block_ptr) << "Incorrect pointer cast";
     T_WS_old = block_ptr->estimate();
     block_ptr->setEstimate(T_WS_old * T_old_new);
 
@@ -1407,7 +1342,7 @@ bool Estimator::setFrameFixed(const BundleId& fixed_frame_bundle_id,
       for (ceres_backend::Map::ResidualBlockSpec& residual : residuals) {
         // find the previously fixed block
         if (residual.error_interface_ptr->typeInfo() == ErrorType::kPoseError) {
-          std::cout << "Removed old fixation";
+          LOG(ERROR) << "Removed old fixation";
           // remove the old fixation
           map_ptr_->removeResidualBlock(residual.residual_block_id);
           deRegisterFixedFrame(nframe_id.asInteger());
@@ -1424,10 +1359,8 @@ bool Estimator::setFrameFixed(const BundleId& fixed_frame_bundle_id,
               std::static_pointer_cast<ceres_backend::PoseParameterBlock>(
                   map_ptr_->parameterBlockPtr(new_fixed_frame.asInteger()));
           registerFixedFrame(nframe_id.asInteger());
-          if (!block_ptr) {
-            throw std::runtime_error("Incorrect pointer cast");
-          }
-          std::cout << "setting pose to " << std::endl << T_WS_new;
+          CHECK(block_ptr) << "Incorrect pointer cast";
+          LOG(ERROR) << "setting pose to " << std::endl << T_WS_new;
           block_ptr->setEstimate(T_WS_new);
           map_ptr_->addResidualBlock(pose_error, nullptr, block_ptr);
           success = true;
@@ -1436,9 +1369,7 @@ bool Estimator::setFrameFixed(const BundleId& fixed_frame_bundle_id,
     }
   }
 
-  if (!success) {
-    throw std::runtime_error("No frame was fixed");
-  }
+  CHECK(success) << "No frame was fixed";
   return success;
 }
 
@@ -1470,9 +1401,7 @@ bool Estimator::removeAllPoseFixation() {
       if (residual.error_interface_ptr->typeInfo() == ErrorType::kPoseError) {
         // remove the old fixation
         bool success_cur = map_ptr_->removeResidualBlock(residual.residual_block_id);
-        if (!success_cur) {
-          throw std::runtime_error("Fixed frame could not be removed");
-        }
+        CHECK(success_cur) << "Fixed frame could not be removed";
         deRegisterFixedFrame(nframe_id.asInteger());
         if (success_cur) {
           success = success_cur;
@@ -1484,20 +1413,14 @@ bool Estimator::removeAllPoseFixation() {
 }
 
 bool Estimator::uniteLandmarks(const BackendId& old_id, const BackendId& new_id) {
-  if (old_id.type() != IdType::Landmark) {
-    throw std::runtime_error("Old id is not landmark");
-  }
-  if (new_id.type() != IdType::Landmark) {
-    throw std::runtime_error("New id is not landmark");
-  }
+  CHECK(old_id.type() == IdType::Landmark) << "Old id is not landmark";
+  CHECK(new_id.type() == IdType::Landmark) << "New id is not landmark";
 
   // get new parameterblock of landmarks
   std::shared_ptr<ceres_backend::HomogeneousPointParameterBlock> new_block =
       std::static_pointer_cast<ceres_backend::HomogeneousPointParameterBlock>(
           map_ptr_->parameterBlockPtr(new_id.asInteger()));
-  if (!new_block) {
-    throw std::runtime_error("New landmark is not in backend");
-  }
+  CHECK(new_block) << "New landmark is not in backend";
 
   ceres_backend::Map::ResidualBlockCollection old_residuals =
       map_ptr_->residuals(old_id.asInteger());
@@ -1532,9 +1455,7 @@ void Estimator::transformMap(const Transformation& w_T, bool remove_marginalizat
     std::shared_ptr<ceres_backend::PoseParameterBlock> block_ptr =
         std::static_pointer_cast<ceres_backend::PoseParameterBlock>(
             map_ptr_->parameterBlockPtr(nframe_id.asInteger()));
-    if (!block_ptr) {
-      throw std::runtime_error("Incorrect pointer cast");
-    }
+    CHECK(block_ptr) << "Incorrect pointer cast";
     block_ptr->setEstimate(w_T * block_ptr->estimate());
   }
 
@@ -1548,9 +1469,7 @@ void Estimator::transformMap(const Transformation& w_T, bool remove_marginalizat
     std::shared_ptr<ceres_backend::HomogeneousPointParameterBlock> block_ptr =
         std::static_pointer_cast<ceres_backend::HomogeneousPointParameterBlock>(
             map_ptr_->parameterBlockPtr(id_and_map_point.first.asInteger()));
-    if (!block_ptr) {
-      throw std::runtime_error("Incorrect pointer cast");
-    }
+    CHECK(block_ptr) << "Incorrect pointer cast";
 
     // update coordinates
     Eigen::Vector4d new_position = w_T.transform4(block_ptr->estimate());
@@ -1560,9 +1479,7 @@ void Estimator::transformMap(const Transformation& w_T, bool remove_marginalizat
   // remove the marginalization error at the associated frames
   if (marginalization_error_ptr_ && remove_marginalization_term) {
     bool success = map_ptr_->removeResidualBlock(marginalization_residual_id_);
-    if (!success) {
-      throw std::runtime_error("Could not remove marginalization error");
-    }
+    CHECK(success) << "could not remove marginalization error";
     // remove pointer and ID
     marginalization_error_ptr_.reset();
     marginalization_residual_id_ = 0;

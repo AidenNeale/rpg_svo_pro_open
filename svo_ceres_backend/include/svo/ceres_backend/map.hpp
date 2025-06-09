@@ -69,14 +69,6 @@ class Map {
   /// @brief Constructor.
   Map();
 
-  /// @brief
-  /// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  /// @param  /
-  //   Map(const Map&) = delete;
-  //   Map& operator=(const Map&) = delete;
-
-  ~Map() { std::cout << "Map destructor called" << std::endl; }
-
   // definitions
   /// @brief Struct to store some infos about a residual.
   struct ResidualBlockSpec {

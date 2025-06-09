@@ -63,15 +63,39 @@ bool PoseLocalParameterization::Minus(const double* x, const double* x_plus_delt
 }
 
 // Computes the Jacobian from minimal space to naively overparameterised space as used by ceres.
-bool PoseLocalParameterization::MinusJacobian(const double* x, double* jacobian) const {
+bool PoseLocalParameterization::ComputeLiftJacobian(const double* x, double* jacobian) const {
   return liftJacobian(x, jacobian);
+}
+
+bool PoseLocalParameterization::MinusJacobian(const double* x, double* jacobian) const {
+  constexpr int kAmbient = 7;
+  constexpr int kTangent = 6;
+  Eigen::Map<Eigen::Matrix<double, kTangent, kAmbient, Eigen::RowMajor>> J(jacobian);
+
+  // Numerical differentiation
+  const double eps = 1e-8;
+  Eigen::Matrix<double, kTangent, 1> delta0, delta1;
+  Eigen::Matrix<double, kAmbient, 1> y = Eigen::Map<const Eigen::Matrix<double, kAmbient, 1>>(x);
+
+  for (int i = 0; i < kAmbient; ++i) {
+    Eigen::Matrix<double, kAmbient, 1> y_plus = y;
+    Eigen::Matrix<double, kAmbient, 1> y_minus = y;
+    y_plus(i) += eps;
+    y_minus(i) -= eps;
+
+    minus(x, y_plus.data(), delta0.data());
+    minus(x, y_minus.data(), delta1.data());
+
+    J.col(i) = (delta0 - delta1) / (2 * eps);
+  }
+  return true;
 }
 
 // Generalization of the addition operation,
 //        x_plus_delta = Plus(x, delta)
 //        with the condition that Plus(x, 0) = x.
 bool PoseLocalParameterization::plus(const double* x, const double* delta, double* x_plus_delta) {
-  Eigen::Map<const Eigen::Matrix<double, 6, 1> > delta_(delta);
+  Eigen::Map<const Eigen::Matrix<double, 6, 1>> delta_(delta);
 
   Quaternion q(x[6], x[3], x[4], x[5]);
   q = Quaternion::exp(delta_.tail<3>()) * q;
@@ -85,10 +109,7 @@ bool PoseLocalParameterization::plus(const double* x, const double* delta, doubl
   x_plus_delta[5] = q.z();
   x_plus_delta[6] = q.w();
 
-  if (std::abs(q.norm() - 1.0) > 1e-13) {
-    throw std::runtime_error(
-        "Quaternion norm is not close to 1.0 in PoseLocalParameterization::plus()");
-  }
+  CHECK_NEAR(q.norm(), 1.0, 1e-13);
 
   return true;
 }
@@ -134,7 +155,7 @@ bool PoseLocalParameterization::minus(const double* x, const double* x_plus_delt
 
 // The jacobian of Plus(x, delta) w.r.t delta at delta = 0.
 bool PoseLocalParameterization::plusJacobian(const double* x, double* jacobian) {
-  Eigen::Map<Eigen::Matrix<double, 7, 6, Eigen::RowMajor> > Jp(jacobian);
+  Eigen::Map<Eigen::Matrix<double, 7, 6, Eigen::RowMajor>> Jp(jacobian);
   Jp.setZero();
 
   // Translational part:
@@ -153,7 +174,7 @@ bool PoseLocalParameterization::plusJacobian(const double* x, double* jacobian) 
 
 // Computes the Jacobian from minimal space to naively overparameterised space as used by ceres.
 bool PoseLocalParameterization::liftJacobian(const double* x, double* jacobian) {
-  Eigen::Map<Eigen::Matrix<double, 6, 7, Eigen::RowMajor> > J_lift(jacobian);
+  Eigen::Map<Eigen::Matrix<double, 6, 7, Eigen::RowMajor>> J_lift(jacobian);
   // Translational part.
   J_lift.setZero();
   J_lift.topLeftCorner<3, 3>().setIdentity();
@@ -172,8 +193,8 @@ bool PoseLocalParameterization::PlusJacobian(const double* x, double* jacobian) 
 bool PoseLocalParameterization::VerifyJacobianNumDiff(const double* x, double* jacobian,
                                                       double* jacobianNumDiff) {
   plusJacobian(x, jacobian);
-  Eigen::Map<Eigen::Matrix<double, 7, 6, Eigen::RowMajor> > Jp(jacobian);
-  Eigen::Map<Eigen::Matrix<double, 7, 6, Eigen::RowMajor> > Jpn(jacobianNumDiff);
+  Eigen::Map<Eigen::Matrix<double, 7, 6, Eigen::RowMajor>> Jp(jacobian);
+  Eigen::Map<Eigen::Matrix<double, 7, 6, Eigen::RowMajor>> Jpn(jacobianNumDiff);
   double dx = 1e-9;
   Eigen::Matrix<double, 7, 1> xp;
   Eigen::Matrix<double, 7, 1> xm;

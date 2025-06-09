@@ -50,32 +50,25 @@ namespace svo {
 inline ceres::ResidualBlockId Estimator::addObservation(const FramePtr &frame,
                                                         const size_t keypoint_idx) {
   const BackendId nframe_id = createNFrameId(frame->bundleId());
-  if (frame->level_vec_(keypoint_idx) < 0) {
-    throw std::runtime_error(
-        "Keypoint level is negative. This should not happen. Keypoint index: " +
-        std::to_string(keypoint_idx) + ", Frame ID: " + std::to_string(frame->getNFrameIndex()));
-  }
+  CHECK_GE(frame->level_vec_(keypoint_idx), 0);
   const int cam_idx = frame->getNFrameIndex();
   // get Landmark ID.
   const BackendId landmark_backend_id = createLandmarkId(frame->track_id_vec_[keypoint_idx]);
-  if (!isLandmarkAdded(landmark_backend_id)) {
-    throw std::runtime_error("Landmark not added");
-  }
+  CHECK(isLandmarkAdded(landmark_backend_id)) << "landmark not added";
 
   KeypointIdentifier kid(frame, keypoint_idx);
   // check for double observations
-  if (landmarks_map_.at(landmark_backend_id).observations.find(kid) !=
-      landmarks_map_.at(landmark_backend_id).observations.end()) {
-    throw std::runtime_error("Trying to add the same landmark for the second time");
-  }
+  CHECK(landmarks_map_.at(landmark_backend_id).observations.find(kid) ==
+        landmarks_map_.at(landmark_backend_id).observations.end())
+      << "Trying to add the same landmark for the second time";
 
   // get the keypoint measurement
   size_t slot;
   bool success;
   std::tie(slot, success) = states_.findSlot(nframe_id);
   if (!success) {
-    std::cerr << "Tried to add observation for frame that is either already "
-              << "marginalized out or not yet added to the state. ID = " << nframe_id;
+    LOG(ERROR) << "Tried to add observation for frame that is either already "
+               << "marginalized out or not yet added to the state. ID = " << nframe_id;
     return nullptr;
   }
 
@@ -83,9 +76,8 @@ inline ceres::ResidualBlockId Estimator::addObservation(const FramePtr &frame,
   information *= 1.0 / static_cast<double>(1 << frame->level_vec_(keypoint_idx));
 
   // create error term
-  if (!std::dynamic_pointer_cast<const Camera>(camera_rig_->getCameraShared(cam_idx))) {
-    throw std::runtime_error("Incorrect pointer cast requested. ");
-  }
+  CHECK(std::dynamic_pointer_cast<const Camera>(camera_rig_->getCameraShared(cam_idx)))
+      << "Incorrect pointer cast requested. ";
   std::shared_ptr<ceres_backend::ReprojectionError> reprojection_error =
       std::make_shared<ceres_backend::ReprojectionError>(
           std::static_pointer_cast<const Camera>(camera_rig_->getCameraShared(cam_idx)),
