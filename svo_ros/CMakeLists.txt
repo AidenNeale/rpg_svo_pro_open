@@ -132,11 +132,8 @@ install(TARGETS ${PROJECT_NAME} svo_node svo_nodelet
 install(DIRECTORY include/
   DESTINATION include/
 )
-install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME}/
-)
 install(
-  DIRECTORY param scripts
+  DIRECTORY param scripts config launch
   DESTINATION share/${PROJECT_NAME}/
 )
 ament_export_libraries(${PROJECT_NAME})

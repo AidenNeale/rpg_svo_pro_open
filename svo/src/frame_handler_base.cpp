@@ -10,6 +10,7 @@
 
 #include <svo/common/conversions.h>
 #include <svo/common/imu_calibration.h>
+#include <svo/common/logging.h>
 #include <svo/common/point.h>
 #include <svo/direct/depth_filter.h>
 #include <svo/direct/feature_detection.h>

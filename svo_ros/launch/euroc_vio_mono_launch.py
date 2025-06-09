@@ -36,7 +36,7 @@ def generate_launch_description():
         executable='rviz2',
         name='vis',
         arguments=['-d', os.path.join(
-            get_package_share_directory('svo_ros'),
+            get_package_share_directory('svo_ros'), 'config',
             'rviz_config_vio.rviz'
         )],
     )

@@ -4,6 +4,9 @@ project(svo_online_loopclosing)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Release)
 
+ADD_DEFINITIONS(-DSVO_USE_OPENGV)
+ADD_DEFINITIONS(-DSVO_DEPTHFILTER_IN_REPROJECTOR)
+
 find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)

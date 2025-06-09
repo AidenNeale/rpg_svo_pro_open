@@ -29,7 +29,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: /svo/image/0
+    SyncSource: /svo/image_0
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -96,11 +96,11 @@ Visualization Manager:
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /svo/image/0
+      Image Topic: /svo/image_0
       Max Value: 1
       Median window: 5
       Min Value: 0
-      Name: /svo/image/0
+      Name: /svo/image_0
       Normalize Range: true
       Queue Size: 2
       Transport Hint: raw
@@ -470,7 +470,7 @@ Visualization Manager:
       Yaw: 4.258607864379883
     Saved: ~
 Window Geometry:
-  /svo/image/0:
+  /svo/image_0:
     collapsed: false
   Displays:
     collapsed: false

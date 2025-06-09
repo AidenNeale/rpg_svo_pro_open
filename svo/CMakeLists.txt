@@ -5,13 +5,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Release)
 
 ADD_DEFINITIONS(-DSVO_LOOP_CLOSING)
-
+ADD_DEFINITIONS(-DSVO_USE_OPENGV)
+ADD_DEFINITIONS(-DSVO_DEPTHFILTER_IN_REPROJECTOR)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_gtest REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(opengv REQUIRED)
 
 find_package(rpg_common REQUIRED)
 find_package(svo_common REQUIRED)
@@ -69,6 +71,7 @@ target_include_directories(${PROJECT_NAME}
 )
 ament_target_dependencies(${PROJECT_NAME}
   rclcpp
+  opengv
   rpg_common
   svo_common
   svo_direct
@@ -83,7 +86,7 @@ ament_target_dependencies(${PROJECT_NAME}
   vikit_ros
   vikit_solver
 )
-target_link_libraries(svo ${OpenCV_LIBRARIES} Eigen3::Eigen)
+target_link_libraries(svo ${OpenCV_LIBRARIES} opengv Eigen3::Eigen)
 
 ################################################################################
 ###
