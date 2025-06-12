@@ -12,6 +12,7 @@
 #include <vikit/timer.h>
 
 #include <numeric>
+#include <thread>
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include <yaml-cpp/yaml.h>
 #pragma diagnostic pop
@@ -513,7 +514,7 @@ bool ImuHandler::waitTill(const double img_timestamp_sec, const double timeout_s
     }
     wait_time.resume();
     // wait
-    std::cout << "Waiting for imu measurements.";
+    VLOG(50) << "Waiting for imu measurements.";
   }
 
   return true;

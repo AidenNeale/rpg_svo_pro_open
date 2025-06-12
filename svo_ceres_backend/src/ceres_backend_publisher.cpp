@@ -24,11 +24,11 @@ namespace svo {
 CeresBackendPublisher::CeresBackendPublisher(const std::shared_ptr<rclcpp::Node>& nh_private,
                                              const std::shared_ptr<ceres_backend::Map>& map_ptr)
     : pnh_(nh_private), map_ptr_(map_ptr) {
-  pub_imu_pose_ =
-      pnh_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("backend_pose_imu", 10);
+  pub_imu_pose_ = pnh_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+      "svo/backend_pose_imu", 10);
   pub_imu_pose_viz_ =
-      pnh_->create_publisher<geometry_msgs::msg::PoseStamped>("backend_pose_imu_viz", 10);
-  pub_points_ = pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("backend_points", 10);
+      pnh_->create_publisher<geometry_msgs::msg::PoseStamped>("svo/backend_pose_imu_viz", 10);
+  pub_points_ = pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("svo/backend_points", 10);
 }
 
 void CeresBackendPublisher::publish(const ViNodeState& state, const int64_t timestamp,

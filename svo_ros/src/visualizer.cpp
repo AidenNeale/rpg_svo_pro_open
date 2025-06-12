@@ -53,55 +53,57 @@ Visualizer::Visualizer(const std::string& trace_dir, std::shared_ptr<rclcpp::Nod
       trace_pointcloud_(vk::param<bool>(pnh_, "trace_pointcloud", false)),
       vis_scale_(vk::param<double>(pnh_, "publish_marker_scale", 1.2)) {
   // Init ROS Marker Publishers
-  pub_frames_ = pnh_->create_publisher<visualization_msgs::msg::Marker>("keyframes", 10);
-  pub_points_ = pnh_->create_publisher<visualization_msgs::msg::Marker>("points", 10000);
+  pub_frames_ = pnh_->create_publisher<visualization_msgs::msg::Marker>("svo/keyframes", 10);
+  pub_points_ = pnh_->create_publisher<visualization_msgs::msg::Marker>("svo/points", 10000);
   pub_imu_pose_ =
-      pnh_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose_imu", 10);
-  pub_info_ = pnh_->create_publisher<svo_msgs::msg::Info>("info", 10);
-  pub_markers_ = pnh_->create_publisher<visualization_msgs::msg::Marker>("markers", 100);
-  pub_pc_ = pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("pointcloud", 1);
+      pnh_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("svo/pose_imu", 10);
+  pub_info_ = pnh_->create_publisher<svo_msgs::msg::Info>("svo/info", 10);
+  pub_markers_ = pnh_->create_publisher<visualization_msgs::msg::Marker>("svo/markers", 100);
+  pub_pc_ = pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("svo/pointcloud", 1);
   pub_dense_.resize(n_cameras);
   pub_images_.resize(n_cameras);
   pub_cam_poses_.resize(n_cameras);
   image_transport::ImageTransport it(pnh_);
   for (size_t i = 0; i < n_cameras; ++i) {
     pub_dense_.at(i) = pnh_->create_publisher<svo_msgs::msg::DenseInputWithFeatures>(
-        "dense_input_" + std::to_string(i), 2);
-    pub_images_.at(i) = it.advertise("image_" + std::to_string(i), 10);
+        "svo/dense_input_" + std::to_string(i), 2);
+    pub_images_.at(i) = it.advertise("svo/image_" + std::to_string(i), 10);
     pub_cam_poses_.at(i) = pnh_->create_publisher<geometry_msgs::msg::PoseStamped>(
-        "pose_cam_" + std::to_string(i), 10);
+        "svo/pose_cam_" + std::to_string(i), 10);
   }
 
 #ifdef SVO_LOOP_CLOSING
   pose_graph_map_.clear();
   pose_graph_map_.header.frame_id = kWorldFrame;
-  pub_loop_closure_ = pnh_->create_publisher<visualization_msgs::msg::Marker>("loop_closures", 10);
-  pub_pose_graph_ = pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("pose_graph", 10);
+  pub_loop_closure_ =
+      pnh_->create_publisher<visualization_msgs::msg::Marker>("svo/loop_closures", 10);
+  pub_pose_graph_ = pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("svo/pose_graph", 10);
   pub_pose_graph_map_ =
-      pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("pose_graph_pointcloud", 10);
+      pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("svo/pose_graph_pointcloud", 10);
 #endif
 
 #ifdef SVO_GLOBAL_MAP
   pub_global_map_kfs_opt_ =
-      pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("global_map_kfs", 10);
+      pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("svo/global_map_kfs", 10);
   pub_global_map_query_kfs_ =
-      pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("global_map_query_kfs", 10);
+      pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("svo/global_map_query_kfs", 10);
   pub_global_map_pts_opt_ =
-      pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("global_map_pts", 10);
+      pnh_->create_publisher<sensor_msgs::msg::PointCloud2>("svo/global_map_pts", 10);
   pub_global_map_vis_ =
-      pnh_->create_publisher<visualization_msgs::msg::Marker>("global_map_all_vis", 10);
+      pnh_->create_publisher<visualization_msgs::msg::Marker>("svo/global_map_all_vis", 10);
   pub_global_map_keypoints_vis_ =
-      pnh_->create_publisher<visualization_msgs::msg::Marker>("global_map_keypoints_vis", 10);
+      pnh_->create_publisher<visualization_msgs::msg::Marker>("svo/global_map_keypoints_vis", 10);
   pub_visible_fixed_landmarks_ =
-      pnh_->create_publisher<visualization_msgs::msg::Marker>("visible_fixed_landmarks", 10);
+      pnh_->create_publisher<visualization_msgs::msg::Marker>("svo/visible_fixed_landmarks", 10);
   pub_global_map_matched_points_ =
-      pnh_->create_publisher<visualization_msgs::msg::Marker>("global_map_matched", 10);
+      pnh_->create_publisher<visualization_msgs::msg::Marker>("svo/global_map_matched", 10);
   pub_global_map_reobserved_points_ =
-      pnh_->create_publisher<visualization_msgs::msg::Marker>("global_map_reobserved", 10);
+      pnh_->create_publisher<visualization_msgs::msg::Marker>("svo/global_map_reobserved", 10);
   pub_global_map_reobserved_points_frontend_ =
-      pnh_->create_publisher<visualization_msgs::msg::Marker>("global_map_reobserved_frontend", 10);
+      pnh_->create_publisher<visualization_msgs::msg::Marker>("svo/global_map_reobserved_frontend",
+                                                              10);
   pub_global_map_point_ids_ =
-      pnh_->create_publisher<visualization_msgs::msg::MarkerArray>("global_map_point_ids", 10);
+      pnh_->create_publisher<visualization_msgs::msg::MarkerArray>("svo/global_map_point_ids", 10);
 #endif
 }
 

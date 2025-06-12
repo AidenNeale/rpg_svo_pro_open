@@ -41,7 +41,6 @@ class CallbackHost {
     for (const Callback& callback : callbacks_) {
       callback(args...);
     }
-    std::cout << callbacks_.size() << " callbacks processed.";
   }
 
  private:
