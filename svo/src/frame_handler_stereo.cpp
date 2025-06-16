@@ -6,6 +6,7 @@
 // This file is subject to the terms and conditions defined in the file
 // 'LICENSE', which is part of this source code package.
 
+#include <glog/logging.h>
 #include <svo/common/frame.h>
 #include <svo/common/point.h>
 #include <svo/direct/depth_filter.h>
@@ -115,9 +116,7 @@ UpdateResult FrameHandlerStereo::makeKeyframe() {
   static size_t kf_counter = 0;
   const size_t kf_id = kf_counter++ % cams_->numCameras();
   const size_t other_id = kf_counter % cams_->numCameras();
-  if (kf_id == other_id) {
-    throw std::runtime_error("kf_id and other_id should not be the same. This is a bug in SVO.");
-  }
+  CHECK(kf_id != other_id);
 
   // ---------------------------------------------------------------------------
   // add extra features when num tracked is critically low!

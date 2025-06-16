@@ -6,6 +6,7 @@
 // This file is subject to the terms and conditions defined in the file
 // 'LICENSE', which is part of this source code package.
 
+#include <glog/logging.h>
 #include <svo/common/camera.h>
 #include <svo/common/frame.h>
 #include <svo/common/logging.h>
@@ -219,16 +220,13 @@ void initializeSeeds(const FramePtr& frame, const AbstractDetector::Ptr& feature
 
   const int max_n_features = max_n_seeds - frame->numFeatures();
   if (max_n_features <= 0) {
-    std::cout << "Skip seed initialization. Have already enough features.";
+    VLOG(3) << "Skip seed initialization. Have already enough features.";
     return;
   }
   if (no_features_in_frame) {
     /// TODO remove
     frame->clearFeatureStorage();
-    if (frame->px_vec_.size() != 0) {
-      throw std::runtime_error(
-          "px_vec_ should be empty when initializing seeds for the first time.");
-    }
+    CHECK_EQ(frame->px_vec_.size(), 0);
 
     feature_detector->detect(frame->img_pyr_, frame->getMask(), max_n_features, frame->px_vec_,
                              frame->score_vec_, frame->level_vec_, frame->grad_vec_,
@@ -249,7 +247,7 @@ void initializeSeeds(const FramePtr& frame, const AbstractDetector::Ptr& feature
       else if (frame->type_vec_[i] == FeatureType::kMapPoint)
         frame->type_vec_[i] = FeatureType::kMapPointSeed;
       else
-        throw std::runtime_error("Unknown feature types.");
+        LOG(FATAL) << "Unknown feature types.";
     }
   } else {
     feature_detector->detect(frame->img_pyr_, frame->getMask(), max_n_features, new_px, new_scores,
@@ -260,9 +258,8 @@ void initializeSeeds(const FramePtr& frame, const AbstractDetector::Ptr& feature
   // Add features to frame.
   const size_t n_old = frame->num_features_;
   const size_t n_new = new_px.cols();
-  if (frame->px_vec_.cols() < static_cast<int>(n_new + n_old)) {
-    throw std::runtime_error("px_vec_ has more columns than expected. ");
-  }
+
+  CHECK_GE(frame->px_vec_.cols(), static_cast<int>(n_new + n_old));
   frame->px_vec_.middleCols(n_old, n_new) = new_px;
   frame->f_vec_.middleCols(n_old, n_new) = new_f;
   frame->grad_vec_.middleCols(n_old, n_new) = new_grads;
@@ -276,7 +273,7 @@ void initializeSeeds(const FramePtr& frame, const AbstractDetector::Ptr& feature
     else if (new_types[i] == FeatureType::kMapPoint)
       frame->type_vec_[j] = FeatureType::kMapPointSeed;
     else
-      throw std::runtime_error("Unknown feature types.");
+      LOG(FATAL) << "Unknown feature types.";
   }
   frame->num_features_ = n_old + n_new;
 
@@ -354,8 +351,8 @@ bool updateSeed(const Frame& cur_frame, Frame& ref_frame, const size_t& seed_ind
   if (std::isnan(seed::mu(state))) SVO_ERROR_STREAM("seed is nan!");
 
   if (std::isnan(std::sqrt(seed::sigma2(state))))
-    std::cerr << "seed sigma is nan!" << seed::sigma2(state) << ", sq"
-              << std::sqrt(seed::sigma2(state)) << ", check-convergence = " << check_convergence;
+    LOG(WARNING) << "seed sigma is nan!" << seed::sigma2(state) << ", sq"
+                 << std::sqrt(seed::sigma2(state)) << ", check-convergence = " << check_convergence;
 
   // search epipolar line, find match, and triangulate to find new depth z
   double depth;
@@ -414,7 +411,7 @@ bool updateFilterVogiatzis(const FloatType z,  // Measurement
 
   const FloatType norm_scale = std::sqrt(sigma2 + tau2);
   if (std::isnan(norm_scale)) {
-    std::cerr << "Update Seed: Sigma2+Tau2 is NaN";
+    LOG(WARNING) << "Update Seed: Sigma2+Tau2 is NaN";
     return false;
   }
 
@@ -440,11 +437,11 @@ bool updateFilterVogiatzis(const FloatType z,  // Measurement
 
   // TODO: This happens sometimes.
   if (sigma2 < 0.0) {
-    std::cerr << "Seed sigma2 is negative!";
+    LOG(WARNING) << "Seed sigma2 is negative!";
     sigma2 = oldsigma2;
   }
   if (mu < 0.0) {
-    std::cerr << "Seed diverged! mu is negative!!";
+    LOG(WARNING) << "Seed diverged! mu is negative!!";
     mu = 1.0;
     return false;
   }
@@ -460,7 +457,7 @@ bool updateFilterGaussian(const FloatType z,  // Measurement
 
   const FloatType norm_scale = std::sqrt(sigma2 + tau2);
   if (std::isnan(norm_scale)) {
-    std::cerr << "Update Seed: Sigma2+Tau2 is NaN";
+    LOG(WARNING) << "Update Seed: Sigma2+Tau2 is NaN";
     return false;
   }
 
@@ -468,12 +465,8 @@ bool updateFilterGaussian(const FloatType z,  // Measurement
   mu = (sigma2 * z + tau2 * mu) / denom;
   sigma2 = sigma2 * tau2 / denom;
 
-  if (sigma2 < 0.0) {
-    throw std::runtime_error("Seed sigma2 is negative!");
-  }
-  if (mu < 0.0) {
-    throw std::runtime_error("Seed diverged! mu is negative!!");
-  }
+  CHECK_GE(sigma2, 0.0);
+  CHECK_GE(mu, 0.0);
   return true;
 }
 

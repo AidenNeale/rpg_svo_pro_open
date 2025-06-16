@@ -2,13 +2,14 @@
 #include <yaml-cpp/yaml.h>
 #pragma diagnostic pop
 
+#include <glog/logging.h>
+
 // std
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-
 // svo
 #include <svo/common/frame.h>
 #include <svo/common/point.h>
@@ -42,7 +43,7 @@ bool saveMap(const MapPtr& map, const std::string& save_dir, const std::string& 
   out << YAML::EndSeq << YAML::Key << "features" << YAML::Value << YAML::BeginSeq;
 
   // safe features
-  throw std::runtime_error("fix implementation.");
+  CHECK(false) << "fix implementation.";
   std::unordered_set<PointPtr> points;
   /*
   for(const auto& keyval : map->keyframes_)
@@ -145,7 +146,7 @@ bool loadMap(const std::string& load_dir, MapPtr& map) {
 
     Vector3d bearing_vector;
     cam->backProject3(px, &bearing_vector);
-    throw std::runtime_error("Load Map Not Implemented.");
+    CHECK(false);
     /* TODO(cfo)
     FeaturePtr f = std::make_shared<Feature>(
           frame, px, bearing_vector.normalized(), level);

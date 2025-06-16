@@ -6,6 +6,7 @@
 // This file is subject to the terms and conditions defined in the file
 // 'LICENSE', which is part of this source code package.
 
+#include <glog/logging.h>
 #include <svo/common/camera.h>
 #include <svo/common/feature_wrapper.h>
 #include <svo/common/frame.h>
@@ -20,9 +21,8 @@ void getWarpMatrixAffine(const CameraPtr& cam_ref, const CameraPtr& cam_cur,
                          const Eigen::Ref<Keypoint>& px_ref, const Eigen::Ref<BearingVector>& f_ref,
                          const double depth_ref, const Transformation& T_cur_ref,
                          const int level_ref, AffineTransformation2* A_cur_ref) {
-  if (!A_cur_ref) {
-    throw std::invalid_argument("A_cur_ref pointer is null");
-  }
+  CHECK_NOTNULL(A_cur_ref);
+
   // Compute affine warp matrix A_ref_cur
   const int kHalfPatchSize = 5;
   const Position xyz_ref = f_ref * depth_ref;
@@ -97,7 +97,7 @@ bool warpAffine(const AffineTransformation2& A_cur_ref, const cv::Mat& img_ref,
                 const int halfpatch_size, uint8_t* patch) {
   Eigen::Matrix2f A_ref_cur = A_cur_ref.inverse().cast<float>() * (1 << search_level);
   if (std::isnan(A_ref_cur(0, 0))) {
-    std::cout << "Affine warp is NaN, probably camera has no translation";
+    LOG(WARNING) << "Affine warp is NaN, probably camera has no translation";
     return false;
   }
 
@@ -170,8 +170,8 @@ bool warpPixelwise(const Frame& cur_frame, const Frame& ref_frame, const Feature
       const int xi = std::floor(ele_ref[0]);
       const int yi = std::floor(ele_ref[1]);
       if (xi < 0 || yi < 0 || xi + 1 >= img_ref.cols || yi + 1 >= img_ref.rows) {
-        std::cout << "ref image: col-" << img_ref.cols << ", row-" << img_ref.rows;
-        std::cout << "xi: " << xi << ", " << "yi: " << yi;
+        VLOG(200) << "ref image: col-" << img_ref.cols << ", row-" << img_ref.rows;
+        VLOG(200) << "xi: " << xi << ", " << "yi: " << yi;
         return false;
       } else {
         const float subpix_x = ele_ref[0] - xi;
@@ -192,13 +192,9 @@ bool warpPixelwise(const Frame& cur_frame, const Frame& ref_frame, const Feature
 
 void createPatchNoWarp(const cv::Mat& img, const Eigen::Vector2i& px, const int halfpatch_size,
                        uint8_t* patch) {
-  if (!patch) {
-    throw std::invalid_argument("patch pointer is null");
-  }
-  if (px(0) < halfpatch_size || px(1) < halfpatch_size || px(0) >= img.cols - halfpatch_size ||
-      px(1) >= img.rows - halfpatch_size) {
-    throw std::out_of_range("px is out of image bounds");
-  }
+  CHECK_NOTNULL(patch);
+  CHECK(px(0) >= halfpatch_size && px(1) >= halfpatch_size && px(0) < img.cols - halfpatch_size &&
+        px(1) < img.rows - halfpatch_size);
 
   const int patch_size = 2 * halfpatch_size;
   uint8_t* patch_ptr = patch;
@@ -214,9 +210,7 @@ void createPatchNoWarp(const cv::Mat& img, const Eigen::Vector2i& px, const int 
 
 void createPatchNoWarpInterpolated(const cv::Mat& img, const Eigen::Ref<Keypoint>& px,
                                    const int halfpatch_size, uint8_t* patch) {
-  if (!patch) {
-    throw std::invalid_argument("patch pointer is null");
-  }
+  CHECK_NOTNULL(patch);
 
   // TODO(cfo): This could be easily implemented using SIMD instructions.
 
@@ -225,10 +219,8 @@ void createPatchNoWarpInterpolated(const cv::Mat& img, const Eigen::Ref<Keypoint
   const float v = px(1);
   const int u_r = std::floor(u);
   const int v_r = std::floor(v);
-  if (u_r < halfpatch_size || v_r < halfpatch_size || u_r >= img.cols - halfpatch_size ||
-      v_r >= img.rows - halfpatch_size) {
-    throw std::out_of_range("px is out of image bounds");
-  }
+  CHECK(u_r >= halfpatch_size && v_r >= halfpatch_size && u_r < img.cols - halfpatch_size &&
+        v_r < img.rows - halfpatch_size);
 
   // compute interpolation weights
   const float subpix_x = u - u_r;

@@ -33,8 +33,8 @@ class CeresBackendPublisher {
   std::shared_ptr<rclcpp::Node> pnh_;
   size_t trace_id_;
   std::string trace_dir_;
-  std::shared_ptr<ros::Publisher<visualization_msgs::msg::Marker>> pub_markers_;
-  std::shared_ptr<ros::Publisher<sensor_msgs::msg::PointCloud2>> pub_pc_;
+  std::shared_ptr<rclcpp::Publisher<visualization_msgs::msg::Marker>> pub_markers_;
+  std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>> pub_pc_;
   double vis_scale_;
   std::ofstream ofs_states_;
   std::ofstream ofs_covariance_;

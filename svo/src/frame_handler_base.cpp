@@ -8,9 +8,9 @@
 
 #include "svo/frame_handler_base.h"
 
+#include <glog/logging.h>
 #include <svo/common/conversions.h>
 #include <svo/common/imu_calibration.h>
-#include <svo/common/logging.h>
 #include <svo/common/point.h>
 #include <svo/direct/depth_filter.h>
 #include <svo/direct/feature_detection.h>
@@ -90,10 +90,7 @@ FrameHandlerBase::FrameHandlerBase(const BaseOptions& base_options,
       tracking_quality_(TrackingQuality::kInsufficient),
       relocalization_n_trials_(0) {
   // sanity checks
-  if (reprojector_options.cell_size != detector_options.cell_size) {
-    throw std::runtime_error(
-        "ReprojectorOptions and DetectorOptions must have the same cell size.");
-  }
+  CHECK_EQ(reprojector_options.cell_size, detector_options.cell_size);
 
   need_new_kf_ = std::bind(&FrameHandlerBase::needNewKf, this, std::placeholders::_1);
 
@@ -157,18 +154,18 @@ FrameHandlerBase::FrameHandlerBase(const BaseOptions& base_options,
       initialization_utils::makeInitializer(init_options, tracker_options, detector_options, cams_);
   overlap_kfs_.resize(cams_->getNumCameras());
 
-  std::cout << "SVO initialized";
+  VLOG(1) << "SVO initialized";
 }
 
-FrameHandlerBase::~FrameHandlerBase() { std::cout << "SVO destructor invoked"; }
+FrameHandlerBase::~FrameHandlerBase() { VLOG(1) << "SVO destructor invoked"; }
 
 //------------------------------------------------------------------------------
 bool FrameHandlerBase::addImageBundle(const std::vector<cv::Mat>& imgs, const uint64_t timestamp) {
   if (last_frames_) {
     // check if the timestamp is valid
     if (last_frames_->getMinTimestampNanoseconds() >= static_cast<int64_t>(timestamp)) {
-      std::cout << "Dropping frame: timestamp older than last frame of id "
-                << last_frames_->getBundleId();
+      VLOG(4) << "Dropping frame: timestamp older than last frame of id "
+              << last_frames_->getBundleId();
       SVO_WARN_STREAM("Dropping frame: timestamp older than last frame.");
       return false;
     }
@@ -179,9 +176,7 @@ bool FrameHandlerBase::addImageBundle(const std::vector<cv::Mat>& imgs, const ui
   if (options_.trace_statistics) {
     SVO_START_TIMER("pyramid_creation");
   }
-  if (imgs.size() != cams_->getNumCameras()) {
-    throw std::runtime_error("Number of images does not match number of cameras.");
-  }
+  CHECK_EQ(imgs.size(), cams_->getNumCameras());
   std::vector<FramePtr> frames;
   for (size_t i = 0; i < imgs.size(); ++i) {
     frames.push_back(std::make_shared<Frame>(cams_->getCameraShared(i), imgs[i].clone(), timestamp,
@@ -199,10 +194,8 @@ bool FrameHandlerBase::addImageBundle(const std::vector<cv::Mat>& imgs, const ui
 
 //------------------------------------------------------------------------------
 bool FrameHandlerBase::addFrameBundle(const FrameBundlePtr& frame_bundle) {
-  std::cout << "New Frame Bundle received: " << frame_bundle->getBundleId();
-  if (frame_bundle->size() != cams_->numCameras()) {
-    throw std::runtime_error("FrameBundle size does not match number of cameras in camera bundle.");
-  }
+  VLOG(40) << "New Frame Bundle received: " << frame_bundle->getBundleId();
+  CHECK_EQ(frame_bundle->size(), cams_->numCameras());
 
   // ---------------------------------------------------------------------------
   // Prepare processing.
@@ -263,7 +256,7 @@ bool FrameHandlerBase::addFrameBundle(const FrameBundlePtr& frame_bundle) {
 
     //--- Actual Update
     // if we are reinitializing, restore the previous states
-    std::cout << "Load map and motion prior from backend.";
+    VLOG(40) << "Load map and motion prior from backend.";
     if (backend_reinit_) {
       bundle_adjustment_->setReinitStartValues(speed_bias_backend_latest_, T_WS_backend_latest_,
                                                timestamp_backend_latest_);
@@ -306,20 +299,20 @@ bool FrameHandlerBase::addFrameBundle(const FrameBundlePtr& frame_bundle) {
     if (!backend_scale_initialized_) {
       if (backend_scale_stable) {
         backend_scale_initialized_ = true;
-        std::cout << "backend scale initialized";
+        VLOG(2) << "backend scale initialized";
       } else if (stage_ != Stage::kInitializing) {
         // the points in the last frame were updated, hence we also update the
         // seeds with the new depth values
         frame_utils::getSceneDepth(last_frames_->frames_[0], depth_median_, depth_min_, depth_max_);
         depth_filter_->updateSeeds(overlap_kfs_.at(0), last_frames_->frames_[0]);
-        std::cout << "Adjusting SVO scale to backend";
+        VLOG(2) << "Adjusting SVO scale to backend";
       }
     }
   } else {
     // Predict pose of new frame using motion prior.
     // TODO(cfo): remove same from processFrame in mono.
     if (last_frames_) {
-      std::cout << "Predict pose of new image using motion prior.";
+      VLOG(40) << "Predict pose of new image using motion prior.";
       getMotionPrior(false);
 
       // set initial pose estimate
@@ -347,7 +340,7 @@ bool FrameHandlerBase::addFrameBundle(const FrameBundlePtr& frame_bundle) {
       }
     }
 #endif
-    std::cout << "Call bundle adjustment.";
+    VLOG(40) << "Call bundle adjustment.";
     bundle_adjustment_->bundleAdjustment(new_frames_);
   }
 
@@ -423,9 +416,7 @@ bool FrameHandlerBase::addFrameBundle(const FrameBundlePtr& frame_bundle) {
   num_obs_last_ = new_frames_->numTrackedFeatures() + new_frames_->numFixedLandmarks();
   if (stage_ == Stage::kTracking) {
     if (isInRecovery()) {
-      if (new_frames_->getMinTimestampSeconds() <= last_good_tracking_time_sec_) {
-        throw std::runtime_error("Timestamp of new frame is in the past");
-      }
+      CHECK_GT(new_frames_->getMinTimestampSeconds(), last_good_tracking_time_sec_);
       if ((new_frames_->getMinTimestampSeconds() - last_good_tracking_time_sec_) <
           options_.global_map_lc_timeout_sec_) {
         setRecovery(false);
@@ -439,17 +430,13 @@ bool FrameHandlerBase::addFrameBundle(const FrameBundlePtr& frame_bundle) {
 
   // Try relocalizing if tracking failed.
   if (update_res_ == UpdateResult::kFailure) {
-    std::cout << "Tracking failed: RELOCALIZE.";
-    if (stage_ != Stage::kTracking || stage_ != Stage::kInitializing ||
-        stage_ != Stage::kRelocalization) {
-      throw std::runtime_error("Tracking failed but not in a valid stage for relocalization.");
-    }
+    VLOG(2) << "Tracking failed: RELOCALIZE.";
+    CHECK(stage_ == Stage::kTracking || stage_ == Stage::kInitializing ||
+          stage_ == Stage::kRelocalization);
 
     // Let's try to relocalize with respect to the last keyframe:
     reloc_keyframe_ = map_->getLastKeyframe();
-    if (!reloc_keyframe_) {
-      throw std::runtime_error("Relocalization failed: No keyframe available for relocalization.");
-    }
+    CHECK_NOTNULL(reloc_keyframe_.get());
 
     // Reset pose to previous frame to avoid crazy jumps.
     if (stage_ == Stage::kTracking && last_frames_) {
@@ -460,8 +447,7 @@ bool FrameHandlerBase::addFrameBundle(const FrameBundlePtr& frame_bundle) {
     // Reset if we tried many times unsuccessfully to relocalize.
     if (stage_ == Stage::kRelocalization &&
         relocalization_n_trials_ >= options_.relocalization_max_trials) {
-      std::cout << "Relocalization failed " << options_.relocalization_max_trials
-                << " times: RESET.";
+      VLOG(2) << "Relocalization failed " << options_.relocalization_max_trials << " times: RESET.";
       set_reset_ = true;
       backend_reinit_ = true;
     }
@@ -496,20 +482,20 @@ bool FrameHandlerBase::addFrameBundle(const FrameBundlePtr& frame_bundle) {
     g_permon->writeToFile();
   }
   // Call callbacks.
-  std::cout << "Triggering addFrameBundle() callbacks...";
+  VLOG(40) << "Triggering addFrameBundle() callbacks...";
   triggerCallbacks(last_frames_);
   return true;
 }
 
 //------------------------------------------------------------------------------
 void FrameHandlerBase::setRotationPrior(const Quaternion& R_imu_world) {
-  std::cout << "Set rotation prior.";
+  VLOG(40) << "Set rotation prior.";
   R_imu_world_ = R_imu_world;
   have_rotation_prior_ = true;
 }
 
 void FrameHandlerBase::setRotationIncrementPrior(const Quaternion& R_lastimu_newimu) {
-  std::cout << "Set rotation increment prior.";
+  VLOG(40) << "Set rotation increment prior.";
   R_imu_world_ = R_lastimu_newimu.inverse() * R_imulast_world_;
   have_rotation_prior_ = true;
 }
@@ -517,13 +503,13 @@ void FrameHandlerBase::setRotationIncrementPrior(const Quaternion& R_lastimu_new
 //------------------------------------------------------------------------------
 void FrameHandlerBase::setInitialPose(const FrameBundlePtr& frame_bundle) const {
   if (have_rotation_prior_) {
-    std::cout << "Set initial pose: With rotation prior";
+    VLOG(40) << "Set initial pose: With rotation prior";
     for (size_t i = 0; i < frame_bundle->size(); ++i) {
       frame_bundle->at(i)->T_f_w_ =
           cams_->get_T_C_B(i) * Transformation(R_imu_world_, Vector3d::Zero());
     }
   } else if (frame_bundle->imu_measurements_.cols() > 0) {
-    std::cout << "Set initial pose: Use inertial measurements in frame to get gravity.";
+    VLOG(40) << "Set initial pose: Use inertial measurements in frame to get gravity.";
     const Vector3d g = frame_bundle->imu_measurements_.topRows<3>().rowwise().sum();
     const Vector3d z = g.normalized();  // imu measures positive-z when static
     // TODO: make sure z != -1,0,0
@@ -539,9 +525,9 @@ void FrameHandlerBase::setInitialPose(const FrameBundlePtr& frame_bundle) const 
     C_imu_world.col(2) = z;
     Transformation T_imu_world(Quaternion(C_imu_world), Eigen::Vector3d::Zero());
     frame_bundle->set_T_W_B(T_imu_world.inverse());
-    std::cout << "Initial Rotation = " << std::endl << C_imu_world.transpose() << std::endl;
+    VLOG(3) << "Initial Rotation = " << std::endl << C_imu_world.transpose() << std::endl;
   } else {
-    std::cout << "Set initial pose: set such that T_imu_world is identity.";
+    VLOG(40) << "Set initial pose: set such that T_imu_world is identity.";
     for (size_t i = 0; i < frame_bundle->size(); ++i) {
       frame_bundle->at(i)->T_f_w_ = cams_->get_T_C_B(i) * T_world_imuinit.inverse();
     }
@@ -554,7 +540,7 @@ size_t FrameHandlerBase::sparseImageAlignment() {
   // this will improve the relative transformation between the previous and the new frame
   // the result is the number of feature points which could be tracked
   // this is a hierarchical KLT solver
-  std::cout << "Sparse image alignment.";
+  VLOG(40) << "Sparse image alignment.";
   if (options_.trace_statistics) {
     SVO_START_TIMER("sparse_img_align");
   }
@@ -575,13 +561,13 @@ size_t FrameHandlerBase::sparseImageAlignment() {
     SVO_STOP_TIMER("sparse_img_align");
     SVO_LOG("img_align_n_tracked", img_align_n_tracked);
   }
-  std::cout << "Sparse image alignment tracked " << img_align_n_tracked << " features.";
+  VLOG(40) << "Sparse image alignment tracked " << img_align_n_tracked << " features.";
   return img_align_n_tracked;
 }
 
 //------------------------------------------------------------------------------
 size_t FrameHandlerBase::projectMapInFrame() {
-  std::cout << "Project map in frame.";
+  VLOG(40) << "Project map in frame.";
   if (options_.trace_statistics) {
     SVO_START_TIMER("reproject");
   }
@@ -649,8 +635,8 @@ size_t FrameHandlerBase::projectMapInFrame() {
     SVO_LOG("repr_n_matches_global_map", cumul_stats_global_map.n_matches);
     SVO_LOG("repr_n_trials_global_map", cumul_stats_global_map.n_trials);
   }
-  std::cout << "Reprojection:" << "\t nPoints = " << cumul_stats_.n_trials
-            << "\t\t nMatches = " << cumul_stats_.n_matches;
+  VLOG(40) << "Reprojection:" << "\t nPoints = " << cumul_stats_.n_trials
+           << "\t\t nMatches = " << cumul_stats_.n_matches;
 
   size_t n_total_ftrs =
       cumul_stats_.n_matches +
@@ -675,7 +661,7 @@ size_t FrameHandlerBase::optimizePose() {
 
   pose_optimizer_->reset();
   if (have_motion_prior_) {
-    std::cout << "Apply prior to pose optimization";
+    VLOG(40) << "Apply prior to pose optimization";
     pose_optimizer_->setRotationPrior(new_frames_->get_T_W_B().getRotation().inverse(),
                                       options_.poseoptim_prior_lambda);
   }
@@ -697,7 +683,7 @@ size_t FrameHandlerBase::optimizePose() {
 //------------------------------------------------------------------------------
 void FrameHandlerBase::optimizeStructure(const FrameBundle::Ptr& frames, int max_n_pts,
                                          int max_iter) {
-  std::cout << "Optimize structure.";
+  VLOG(40) << "Optimize structure.";
   // some feature points will be optimized w.r.t keyframes they were observed
   // in the way that their projection error into all other keyframes is minimzed
 
@@ -736,7 +722,7 @@ void FrameHandlerBase::optimizeStructure(const FrameBundle::Ptr& frames, int max
 
 //------------------------------------------------------------------------------
 void FrameHandlerBase::upgradeSeedsToFeatures(const FramePtr& frame) {
-  std::cout << "Upgrade seeds to features";
+  VLOG(40) << "Upgrade seeds to features";
   size_t update_count = 0;
   size_t unconverged_cnt = 0;
   for (size_t i = 0; i < frame->num_features_; ++i) {
@@ -746,10 +732,7 @@ void FrameHandlerBase::upgradeSeedsToFeatures(const FramePtr& frame) {
           type == FeatureType::kMapPoint) {
         frame->landmark_vec_[i]->addObservation(frame, i);
       } else {
-        if (!isFixedLandmark(type)) {
-          throw std::runtime_error("Landmark type not supported for upgrade: " +
-                                   std::to_string(static_cast<int>(type)));
-        }
+        CHECK(isFixedLandmark(type));
         frame->landmark_vec_[i]->addObservation(frame, i);
       }
     } else if (frame->seed_ref_vec_[i].keyframe) {
@@ -791,7 +774,7 @@ void FrameHandlerBase::upgradeSeedsToFeatures(const FramePtr& frame) {
             (frame->px_vec_.col(i) / (1 << frame->level_vec_[i])).cast<int>(), 4u);
         frame->grad_vec_.col(i) = GradientVector(std::cos(angle), std::sin(angle));
       } else {
-        throw std::runtime_error("Seed-Type not known");
+        CHECK(false) << "Seed-Type not known";
       }
       ++update_count;
     }
@@ -800,11 +783,11 @@ void FrameHandlerBase::upgradeSeedsToFeatures(const FramePtr& frame) {
     frame->seed_ref_vec_[i].keyframe.reset();
     frame->seed_ref_vec_[i].seed_id = -1;
   }
-  std::cout << "NEW KEYFRAME: Updated " << update_count << " seeds to features in reference frame, "
-            << "including " << unconverged_cnt << " unconverged points.\n";
+  VLOG(5) << "NEW KEYFRAME: Updated " << update_count << " seeds to features in reference frame, "
+          << "including " << unconverged_cnt << " unconverged points.\n";
   const double ratio = (1.0 * unconverged_cnt) / update_count;
   if (ratio > 0.2) {
-    std::cout << ratio * 100 << "% updated seeds are unconverged.";
+    LOG(WARNING) << ratio * 100 << "% updated seeds are unconverged.";
   }
 }
 
@@ -833,7 +816,7 @@ void FrameHandlerBase::resetVisionFrontendCommon() {
   depth_filter_->reset();
   initializer_->reset();
 
-  std::cout << "SVO RESET ALL";
+  VLOG(1) << "SVO RESET ALL";
 }
 
 void FrameHandlerBase::resetBackend() {
@@ -848,7 +831,7 @@ void FrameHandlerBase::resetBackend() {
     }
 #endif
     bundle_adjustment_->reset();
-    std::cout << "Resetting backend, the pointer will be reset.";
+    LOG(WARNING) << "Resetting backend, the pointer will be reset.";
     bundle_adjustment_.reset();
     bundle_adjustment_type_ = BundleAdjustmentType::kNone;
   }
@@ -898,7 +881,7 @@ bool FrameHandlerBase::needNewKf(const Transformation&) {
           fabs(relpos.z()) / depth_median_ < options_.kfselect_min_dist * 1.3)
         return false;
     }
-    std::cout << "KF Select: NEW KEYFRAME";
+    VLOG(40) << "KF Select: NEW KEYFRAME";
     return true;
   }
 
@@ -913,19 +896,19 @@ bool FrameHandlerBase::needNewKf(const Transformation&) {
   size_t n_tracked_fts = new_frames_->numTrackedLandmarks();
 
   if (n_tracked_fts > options_.kfselect_numkfs_upper_thresh) {
-    std::cout << "KF Select: NO NEW KEYFRAME Above upper bound";
+    VLOG(40) << "KF Select: NO NEW KEYFRAME Above upper bound";
     return false;
   }
 
   // TODO: this only works for mono!
   if (last_frames_->at(0)->id() - map_->last_added_kf_id_ <
       options_.kfselect_min_num_frames_between_kfs) {
-    std::cout << "KF Select: NO NEW KEYFRAME We just had a KF";
+    VLOG(40) << "KF Select: NO NEW KEYFRAME We just had a KF";
     return false;
   }
 
   if (n_tracked_fts < options_.kfselect_numkfs_lower_thresh) {
-    std::cout << "KF Select: NEW KEYFRAME Below lower bound";
+    VLOG(40) << "KF Select: NEW KEYFRAME Below lower bound";
     return true;
   }
 
@@ -953,9 +936,9 @@ bool FrameHandlerBase::needNewKf(const Transformation&) {
 
     if (!disparities.empty()) {
       double disparity = vk::getMedian(disparities);
-      std::cout << "KF Select: disparity = " << disparity;
+      VLOG(40) << "KF Select: disparity = " << disparity;
       if (disparity < options_.kfselect_min_disparity) {
-        std::cout << "KF Select: NO NEW KEYFRAME disparity not large enough";
+        VLOG(40) << "KF Select: NO NEW KEYFRAME disparity not large enough";
         return false;
       }
     }
@@ -969,22 +952,22 @@ bool FrameHandlerBase::needNewKf(const Transformation&) {
                      180 / M_PI;
     const double d = (new_frames_->at(0)->pos() - kf->pos()).norm();
     if (a < options_.kfselect_min_angle && d < options_.kfselect_min_dist_metric) {
-      std::cout << "KF Select: NO NEW KEYFRAME Min angle = " << a << ", min dist = " << d;
+      VLOG(40) << "KF Select: NO NEW KEYFRAME Min angle = " << a << ", min dist = " << d;
       return false;
     }
   }
-  std::cout << "KF Select: NEW KEYFRAME";
+  VLOG(40) << "KF Select: NEW KEYFRAME";
   return true;
 }
 
 void FrameHandlerBase::getMotionPrior(const bool /*use_velocity_in_frame*/) {
   if (have_rotation_prior_) {
-    std::cout << "Get motion prior from provided rotation prior.";
+    VLOG(40) << "Get motion prior from provided rotation prior.";
     T_newimu_lastimu_prior_ =
         Transformation(R_imulast_world_ * R_imu_world_.inverse(), t_lastimu_newimu_).inverse();
     have_motion_prior_ = true;
   } else if (new_frames_->imu_timestamps_ns_.cols() > 0) {
-    std::cout << "Get motion prior from integrated IMU measurements.";
+    VLOG(40) << "Get motion prior from integrated IMU measurements.";
     const Eigen::Matrix<int64_t, 1, Eigen::Dynamic>& imu_timestamps_ns =
         new_frames_->imu_timestamps_ns_;
     const Eigen::Matrix<double, 6, Eigen::Dynamic>& imu_measurements =
@@ -995,9 +978,7 @@ void FrameHandlerBase::getMotionPrior(const bool /*use_velocity_in_frame*/) {
     for (size_t m_idx = 0u; m_idx < num_measurements - 1u; ++m_idx) {
       const double delta_t_seconds = (imu_timestamps_ns(m_idx + 1) - imu_timestamps_ns(m_idx)) *
                                      common::conversions::kNanoSecondsToSeconds;
-      if (delta_t_seconds > 1e-12) {
-        throw std::runtime_error("IMU timestamps need to be strictly increasing.");
-      }
+      CHECK_LE(delta_t_seconds, 1e-12) << "IMU timestamps need to be strictly increasing.";
 
       const Eigen::Vector3d w = imu_measurements.col(m_idx).tail<3>() - gyro_bias;
       const Quaternion R_incr = Quaternion::exp(w * delta_t_seconds);
@@ -1038,7 +1019,7 @@ void FrameHandlerBase::getMotionPrior(const bool /*use_velocity_in_frame*/) {
    */
   else if (options_.poseoptim_prior_lambda > 0 || options_.img_align_prior_lambda_rot > 0 ||
            options_.img_align_prior_lambda_trans > 0) {
-    std::cout << "Get motion prior by assuming constant velocity.";
+    VLOG(40) << "Get motion prior by assuming constant velocity.";
     T_newimu_lastimu_prior_ = Transformation(Quaternion(), t_lastimu_newimu_).inverse();
     have_motion_prior_ = true;
   }
@@ -1049,9 +1030,7 @@ void FrameHandlerBase::getMotionPrior(const bool /*use_velocity_in_frame*/) {
 void FrameHandlerBase::setDetectorOccupiedCells(const size_t reprojector_grid_idx,
                                                 const DetectorPtr& feature_detector) {
   const Reprojector& rep = *reprojectors_.at(reprojector_grid_idx);
-  if (feature_detector->grid_.size() != rep.grid_->size()) {
-    throw std::runtime_error("Reprojector grid size does not match feature detector grid size.");
-  }
+  CHECK_EQ(feature_detector->grid_.size(), rep.grid_->size());
   feature_detector->grid_.occupancy_ = rep.grid_->occupancy_;
   if (rep.fixed_landmark_grid_) {
     for (size_t idx = 0; idx < rep.fixed_landmark_grid_->size(); idx++) {

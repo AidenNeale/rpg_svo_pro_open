@@ -1,5 +1,7 @@
 #include <gflags/gflags.h>
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
+
 // svo
 #include <svo/common/camera.h>
 #include <svo/common/frame.h>
@@ -10,8 +12,6 @@
 #include <svo/direct/patch_utils.h>
 #include <svo/direct/patch_warp.h>
 #include <svo/test_utils/synthetic_dataset.h>
-
-#include <ament_index_cpp/get_package_share_directory.hpp>
 
 // others
 #include <opencv2/highgui/highgui.hpp>  // imread
@@ -44,7 +44,7 @@ void testAlignment1D_sameImg() {
   cv::Mat ref_depthmap;
   dataset.getNextFrame(5u, ref_frame, &ref_depthmap);
   detector->detect(ref_frame);
-  std::cout << "Detected " << ref_frame->numFeatures() << " features.";
+  VLOG(1) << "Detected " << ref_frame->numFeatures() << " features.";
 
   // For each feature, test 1D alignment.
   cur_frame = ref_frame;
@@ -62,8 +62,8 @@ void testAlignment1D_sameImg() {
                                    ref_patch_with_border, ref_patch, 30, true, false, &kp_cur);
 
     Keypoint kp_error = kp_cur - kp_ref;
-    std::cout << "init_error = " << init_error << ", final error = " << kp_error.norm()
-              << ((res) ? " SUCCESS" : " FAILURE");
+    VLOG(1) << "init_error = " << init_error << ", final error = " << kp_error.norm()
+            << ((res) ? " SUCCESS" : " FAILURE");
   }
 }
 
@@ -88,7 +88,7 @@ void testAlignment1D_differentImg() {
   cv::Mat ref_depthmap;
   dataset.getNextFrame(5u, ref_frame, &ref_depthmap);
   detector->detect(ref_frame);
-  std::cout << "Detected " << ref_frame->numFeatures() << " features.";
+  VLOG(1) << "Detected " << ref_frame->numFeatures() << " features.";
 
   // Get next frame.
   for (size_t i = 0; i < 10; ++i) dataset.getNextFrame(5u, cur_frame, nullptr);
@@ -96,9 +96,7 @@ void testAlignment1D_differentImg() {
 
   // For each feature, test 1D alignment.
   Matcher matcher;
-  if (static_cast<size_t>(ref_frame->px_vec_.cols()) != ref_frame->numFeatures()) {
-    throw std::runtime_error("Number of features does not match");
-  }
+  CHECK_EQ(static_cast<size_t>(ref_frame->px_vec_.cols()), ref_frame->numFeatures());
   for (int i = 0; i < ref_frame->px_vec_.cols(); ++i) {
     double ref_depth = ref_depthmap.at<float>(ref_frame->px_vec_(1, i), ref_frame->px_vec_(0, i));
     const Eigen::Vector3d xyz_cur = T_cur_ref * (ref_frame->f_vec_.col(i) * ref_depth);
@@ -116,18 +114,21 @@ void testAlignment1D_differentImg() {
     GradientVector cur_grad(std::cos(angle), std::sin(angle));
 
     double alignment_error = cur_grad.dot(px_cur_distorted - px_cur);
-    std::cout << "final error = " << alignment_error;
+    VLOG(1) << "final error = " << alignment_error;
   }
 }
 
 }  // namespace
 
 int main(int argc, char **argv) {
-  std::cout << "TEST 1 ---------------------------------------------------------";
+  google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+
+  VLOG(1) << "TEST 1 ---------------------------------------------------------";
   testAlignment1D_differentImg();
-  std::cout << "TEST 2 ---------------------------------------------------------";
+  VLOG(1) << "TEST 2 ---------------------------------------------------------";
   testAlignment1D_sameImg();
-  std::cout << "FINISHED -------------------------------------------------------";
+  VLOG(1) << "FINISHED -------------------------------------------------------";
 
   return 0;
 }

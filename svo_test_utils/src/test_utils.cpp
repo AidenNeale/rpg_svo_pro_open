@@ -4,8 +4,9 @@
 #include <numeric>
 #include <opencv2/opencv.hpp>
 #ifdef SVO_USE_ROS
-#include <ros/package.h>
 #include <vikit/params_helper.h>
+
+#include <rclcpp/rclcpp.hpp>
 #endif
 
 namespace svo {

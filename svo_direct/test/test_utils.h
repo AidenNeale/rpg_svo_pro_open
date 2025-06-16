@@ -6,6 +6,7 @@
 #ifndef TEST_UTILS_H_
 #define TEST_UTILS_H_
 
+#include <glog/logging.h>
 #include <svo/common/camera.h>
 #include <svo/common/frame.h>
 #include <vikit/params_helper.h>
@@ -50,14 +51,12 @@ class Dataset {
     std::string img_name;
     img_fs_ >> img_id >> stamp_seconds >> img_name;
     img_fs_.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    if (img_id < first_frame_id_) {
-      throw std::runtime_error("Image list is misordered.");
-    }
+    CHECK(img_id >= first_frame_id_) << "image list is misordered.";
     uint64_t stamp = stamp_seconds * 1e9;
     std::string img_filename(dataset_dir_ + "data/" + img_name);
     cv::Mat img(cv::imread(img_filename, 0));
     if (img.empty()) {
-      std::cerr << "fail to read image: " << img_filename;
+      LOG(ERROR) << "fail to read image: " << img_filename;
       return svo::FramePtr();
     }
 
@@ -73,17 +72,13 @@ class Dataset {
   void init() {
     // load camera
     ncam_ = CameraBundle::loadFromYaml(dataset_dir_ + "calib.yaml");
-    if (!ncam_) {
-      throw std::runtime_error("fail to load camera.");
-    }
+    if (!ncam_) LOG(FATAL) << "fail to load camera.";
     cam_ = ncam_->getCameraShared(cam_index_);
 
     // initializing image file list
     std::string img_filename(dataset_dir_ + "data/images.txt");
     img_fs_.open(img_filename.c_str());
-    if (!img_fs_.is_open()) {
-      throw std::runtime_error("fail to load image list.");
-    }
+    if (!img_fs_.is_open()) LOG(FATAL) << "fail to load image list.";
 
     skipFrames(first_frame_id_);
   }
@@ -106,7 +101,7 @@ class Dataset {
       else
         return;
     }
-    throw std::runtime_error("image list corrupted or first_frame_id exceeds rang listed.");
+    LOG(FATAL) << "image list corrupted or first_frame_id exceeds rang listed.";
   }
 
   // dataset dir
@@ -159,12 +154,8 @@ inline Eigen::Vector3d generateRandomPoint(double max_depth, double min_depth) {
 }
 
 inline void calcHist(const std::vector<double>& values, size_t bins, std::vector<size_t>* hist) {
-  if (values.empty() || bins < 2) {
-    throw std::runtime_error("Invalid input for histogram calculation.");
-  }
-  if (!hist) {
-    throw std::invalid_argument("Histogram pointer is null.");
-  }
+  CHECK(!values.empty() && bins >= 2);
+  CHECK_NOTNULL(hist);
   hist->assign(bins, 0);
   double max = *std::max_element(values.begin(), values.end());
   double min = *std::min_element(values.begin(), values.end());
@@ -184,12 +175,8 @@ inline void calcHist(const std::vector<double>& values, size_t bins, std::vector
 // TODO(zzc): auto zoom for the text
 inline cv::Mat drawHist(const std::vector<size_t>& hist, const std::vector<double>& bounds,
                         int width, int height) {
-  if (width <= 0 || height <= 0) {
-    throw std::invalid_argument("Width and height must be positive.");
-  }
-  if (hist.empty() || bounds.size() != hist.size() + 1) {
-    throw std::invalid_argument("Histogram and bounds size mismatch.");
-  }
+  CHECK(width > 0 && height > 0);
+  CHECK(!hist.empty() && bounds.size() == hist.size() + 1);
 
   size_t hist_bin_num = hist.size();
   cv::Mat histogram(height, width, CV_8UC1, cv::Scalar(255));

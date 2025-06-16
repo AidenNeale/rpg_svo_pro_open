@@ -28,7 +28,7 @@ find_package(opengv REQUIRED)
 find_package(OpenMP QUIET)
 if (OPENMP_FOUND)
   message(STATUS "OpenMP found")
-  # add_definitions(-DUSE_OPENMP)
+  add_definitions(-DUSE_OPENMP)
 endif ()
 
 #############

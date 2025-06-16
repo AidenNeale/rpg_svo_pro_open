@@ -6,6 +6,7 @@
 // This file is subject to the terms and conditions defined in the file
 // 'LICENSE', which is part of this source code package.
 
+#include <glog/logging.h>
 #include <svo/common/frame.h>
 #include <svo/common/point.h>
 #include <svo/map.h>
@@ -32,7 +33,7 @@ void Map::reset() {
 void Map::removeKeyframe(const int frame_id) {
   auto it_kf = keyframes_.find(frame_id);
   if (it_kf == keyframes_.end()) {
-    std::cerr << "Cannot find the keyframe with id " << frame_id << ", will not do anything.";
+    LOG(WARNING) << "Cannot find the keyframe with id " << frame_id << ", will not do anything.";
     return;
   }
   const FramePtr& frame = it_kf->second;
@@ -81,7 +82,7 @@ void Map::emptyPointsTrash() {
 }
 
 void Map::addKeyframe(const FramePtr& new_keyframe, bool temporal_map) {
-  std::cout << "Adding keyframe to map. Frame-Id = " << new_keyframe->id();
+  VLOG(100) << "Adding keyframe to map. Frame-Id = " << new_keyframe->id();
 
   keyframes_.insert(std::make_pair(new_keyframe->id(), new_keyframe));
   last_added_kf_id_ = new_keyframe->id();
@@ -92,9 +93,7 @@ void Map::addKeyframe(const FramePtr& new_keyframe, bool temporal_map) {
 
 void Map::getOverlapKeyframes(const FramePtr& frame,
                               std::vector<std::pair<FramePtr, double>>* close_kfs) const {
-  if (!close_kfs) {
-    throw std::invalid_argument("close_kfs pointer is null");
-  }
+  CHECK_NOTNULL(close_kfs);
   for (const auto& kf : keyframes_) {
     // check first if Point is visible in the Keyframe, use therefore KeyPoints
     for (const auto& keypoint : kf.second->key_pts_) {
@@ -111,9 +110,7 @@ void Map::getOverlapKeyframes(const FramePtr& frame,
 
 void Map::getClosestNKeyframesWithOverlap(const FramePtr& cur_frame, const size_t num_frames,
                                           std::vector<FramePtr>* close_kfs) const {
-  if (!close_kfs) {
-    throw std::invalid_argument("close_kfs pointer is null");
-  }
+  CHECK_NOTNULL(close_kfs);
   std::vector<std::pair<FramePtr, double>> overlap_kfs;
   getOverlapKeyframes(cur_frame, &overlap_kfs);
   if (overlap_kfs.empty()) return;
@@ -131,9 +128,7 @@ void Map::getClosestNKeyframesWithOverlap(const FramePtr& cur_frame, const size_
 }
 
 FramePtr Map::getClosestKeyframe(const FramePtr& frame) const {
-  if (!frame) {
-    throw std::invalid_argument("Frame pointer is null");
-  }
+  CHECK_NOTNULL(frame.get());
   std::vector<std::pair<FramePtr, double>> close_kfs;
   getOverlapKeyframes(frame, &close_kfs);
   if (close_kfs.empty()) return nullptr;
@@ -180,7 +175,7 @@ void Map::transform(const Matrix3d& R, const Vector3d& t, const double& s) {
     Vector3d pos = s * R * kf.second->pos() + t;
     Matrix3d rot = R * kf.second->T_f_w_.getRotation().inverse().getRotationMatrix();
     kf.second->T_f_w_ = Transformation(Quaternion(rot), pos).inverse();
-    throw std::runtime_error("Map::transform not implemented for FrameHandlerBase yet.");
+    CHECK(false);
     /* TODO(cfo)
     for(const auto& ftr : kf.second->fts_)
     {
@@ -198,38 +193,14 @@ void Map::checkDataConsistency() const {
     const FramePtr& frame = kf.second;
 
     // check that feature-stuff has all same length
-    if (frame->px_vec_.cols() != frame->f_vec_.cols()) {
-      throw std::runtime_error(
-          "Map::checkDataConsistency: px_vec_ and f_vec_ have different sizes.");
-    }
-    if (frame->px_vec_.cols() != frame->level_vec_.size()) {
-      throw std::runtime_error(
-          "Map::checkDataConsistency: px_vec_ and level_vec_ have different sizes.");
-    }
-    if (frame->px_vec_.cols() != frame->grad_vec_.cols()) {
-      throw std::runtime_error(
-          "Map::checkDataConsistency: px_vec_ and grad_vec_ have different sizes.");
-    }
-    if (static_cast<size_t>(frame->px_vec_.cols()) != frame->type_vec_.size()) {
-      throw std::runtime_error(
-          "Map::checkDataConsistency: px_vec_ and type_vec_ have different sizes.");
-    }
-    if (static_cast<size_t>(frame->px_vec_.cols()) != frame->landmark_vec_.size()) {
-      throw std::runtime_error(
-          "Map::checkDataConsistency: px_vec_ and landmark_vec_ have different sizes.");
-    }
-    if (static_cast<size_t>(frame->px_vec_.cols()) != frame->seed_ref_vec_.size()) {
-      throw std::runtime_error(
-          "Map::checkDataConsistency: px_vec_ and seed_ref_vec_ have different sizes.");
-    }
-    if (frame->px_vec_.cols() != frame->invmu_sigma2_a_b_vec_.cols()) {
-      throw std::runtime_error(
-          "Map::checkDataConsistency: px_vec_ and invmu_sigma2_a_b_vec_ have different sizes.");
-    }
-    if (frame->num_features_ > static_cast<size_t>(frame->px_vec_.cols())) {
-      throw std::runtime_error(
-          "Map::checkDataConsistency: num_features_ is larger than px_vec_.cols().");
-    }
+    CHECK_EQ(frame->px_vec_.cols(), frame->f_vec_.cols());
+    CHECK_EQ(frame->px_vec_.cols(), frame->level_vec_.size());
+    CHECK_EQ(frame->px_vec_.cols(), frame->grad_vec_.cols());
+    CHECK_EQ(static_cast<size_t>(frame->px_vec_.cols()), frame->type_vec_.size());
+    CHECK_EQ(static_cast<size_t>(frame->px_vec_.cols()), frame->landmark_vec_.size());
+    CHECK_EQ(static_cast<size_t>(frame->px_vec_.cols()), frame->seed_ref_vec_.size());
+    CHECK_EQ(frame->px_vec_.cols(), frame->invmu_sigma2_a_b_vec_.cols());
+    CHECK_LE(frame->num_features_, static_cast<size_t>(frame->px_vec_.cols()));
 
     // check features
     for (size_t i = 0; i < frame->num_features_; ++i) {
@@ -240,30 +211,16 @@ void Map::checkDataConsistency() const {
           if (o.frame_id == frame->id()) {
             ++ref_count;
             const FramePtr obs_frame = o.frame.lock();
-            if (obs_frame.get() != frame.get()) {
-              throw std::runtime_error(
-                  "Map::checkDataConsistency: Frame in observation does not match current frame.");
-            }
+            CHECK_EQ(obs_frame.get(), frame.get());
           }
         }
-        if (ref_count != 1u) {
-          throw std::runtime_error("Map::checkDataConsistency: Point has " +
-                                   std::to_string(ref_count) +
-                                   " references in current frame, but should have exactly one.");
-        }
-      }
-      if ((!(isSeed(frame->type_vec_[i]) && frame->landmark_vec_[i] == nullptr)) ||
-          isSeed(frame->type_vec_[i])) {
-        throw std::runtime_error(
-            "Map::checkDataConsistency: Feature type is not a seed or landmark is not null.");
+        CHECK_EQ(ref_count, 1u);
       }
 
-      if (frame->seed_ref_vec_[i].keyframe != nullptr) {
-        throw std::runtime_error("Map::checkDataConsistency: Seed reference should not be set.");
-      }
-      if (frame->seed_ref_vec_[i].seed_id != -1) {
-        throw std::runtime_error("Map::checkDataConsistency: Seed ID should be -1 for non-seeds.");
-      }
+      CHECK((isSeed(frame->type_vec_[i]) && frame->landmark_vec_[i] == nullptr) ||
+            !isSeed(frame->type_vec_[i]));
+      CHECK(frame->seed_ref_vec_[i].keyframe == nullptr);
+      CHECK(frame->seed_ref_vec_[i].seed_id == -1);
     }
   }
 }

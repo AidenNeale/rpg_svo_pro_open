@@ -6,6 +6,7 @@
 // This file is subject to the terms and conditions defined in the file
 // 'LICENSE', which is part of this source code package.
 
+#include <glog/logging.h>
 #include <svo/common/frame.h>
 #include <svo/common/point.h>
 #include <svo/common/seed.h>
@@ -36,12 +37,8 @@ void PoseOptimizer::setRotationPrior(const Quaternion& R_frame_world, double lam
 }
 
 size_t PoseOptimizer::run(const FrameBundle::Ptr& frame_bundle, double reproj_thresh_px) {
-  if (frame_bundle->empty()) {
-    throw std::runtime_error("PoseOptimizer: FrameBundle is empty");
-  }
-  if (frame_bundle->numFeatures() <= 0u) {
-    throw std::runtime_error("PoseOptimizer: No features in frames");
-  }
+  CHECK(!frame_bundle->empty()) << "PoseOptimizer: FrameBundle is empty";
+  CHECK_GT(frame_bundle->numFeatures(), 0u) << "PoseOptimizer: No features in frames";
 
   focal_length_ = frame_bundle->at(0)->getErrorMultiplier();
   frame_bundle_ = frame_bundle;
@@ -51,7 +48,7 @@ size_t PoseOptimizer::run(const FrameBundle::Ptr& frame_bundle, double reproj_th
   std::vector<float> start_errors;
   evaluateErrorImpl(T_imu_world, nullptr, nullptr, &start_errors);
   measurement_sigma_ = scale_estimator_.compute(start_errors);
-  std::cout << "Initial measurement sigma:" << measurement_sigma_;
+  VLOG(5) << "Initial measurement sigma:" << measurement_sigma_;
 
   // Run Gauss Newton optimization.
   optimize(T_imu_world);
@@ -67,8 +64,8 @@ size_t PoseOptimizer::run(const FrameBundle::Ptr& frame_bundle, double reproj_th
     removeOutliers(reproj_thresh_px, f.get(), &final_errors, &n_deleted_edges, &n_deleted_corners);
   }
 
-  std::cout << "PoseOptimzer: drop " << n_deleted_corners << " corner outliers and "
-            << n_deleted_edges << " edgelet outliers out of " << n_meas_ << " measurements.";
+  VLOG(5) << "PoseOptimzer: drop " << n_deleted_corners << " corner outliers and "
+          << n_deleted_edges << " edgelet outliers out of " << n_meas_ << " measurements.";
 
   // TODO(zzc): for bearing vector difference, can we also save errors in pixels?
   // save statistics
@@ -150,9 +147,7 @@ double PoseOptimizer::evaluateErrorImpl(const Transformation& T_imu_world, Hessi
         }
       }
       if (unwhitened_errors) {
-        if (unwhitened_error < 0.0) {
-          throw std::runtime_error("PoseOptimizer: Negative unwhitened error detected.");
-        }
+        CHECK_GE(unwhitened_error, 0.0);
         unwhitened_errors->push_back(unwhitened_error / scale);
       }
       chi2_error_sum += chi2_error;
@@ -166,18 +161,10 @@ double PoseOptimizer::evaluateErrorImpl(const Transformation& T_imu_world, Hessi
 void PoseOptimizer::removeOutliers(const double reproj_err_threshold, Frame* frame,
                                    std::vector<double>* reproj_errors, std::size_t* n_deleted_edges,
                                    std::size_t* n_deleted_corners) {
-  if (!frame) {
-    throw std::runtime_error("PoseOptimizer: Frame pointer is null.");
-  }
-  if (!reproj_errors) {
-    throw std::runtime_error("PoseOptimizer: Null pointer for reproj_errors.");
-  }
-  if (!n_deleted_edges) {
-    throw std::runtime_error("PoseOptimizer: Null pointer for n_deleted_edges.");
-  }
-  if (!n_deleted_corners) {
-    throw std::runtime_error("PoseOptimizer: Null pointer for n_deleted_corners.");
-  }
+  CHECK_NOTNULL(frame);
+  CHECK_NOTNULL(reproj_errors);
+  CHECK_NOTNULL(n_deleted_edges);
+  CHECK_NOTNULL(n_deleted_corners);
 
   // calculate threhold for once
   static double threshold_uplane = reproj_err_threshold / focal_length_;

@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <glog/logging.h>
 #include <svo/common/types.h>
 
 #include <opencv2/imgproc/imgproc.hpp>
@@ -25,18 +26,14 @@ inline void createPatchFromPatchWithBorder(const uint8_t* const patch_with_borde
 }
 
 inline void patchToMat(const uint8_t* const patch_data, const size_t patch_width, cv::Mat* img) {
-  if (!img) {
-    throw std::invalid_argument("img pointer is null");
-  }
+  CHECK_NOTNULL(img);
   *img = cv::Mat(patch_width, patch_width, CV_8UC1);
   std::memcpy(img->data, patch_data, patch_width * patch_width);
 }
 
 inline void normalizeAndUpsamplePatch(const cv::Mat& patch, double upsample_factor,
                                       cv::Mat* img_rgb) {
-  if (!img_rgb) {
-    throw std::invalid_argument("img_rgb pointer is null");
-  }
+  CHECK_NOTNULL(img_rgb);
 
   cv::Mat patch_normalized;
   if (patch.type() == CV_32FC1) {
@@ -49,7 +46,7 @@ inline void normalizeAndUpsamplePatch(const cv::Mat& patch, double upsample_fact
     cv::minMaxLoc(patch_normalized, &minval, &maxval);
     patch_normalized = (patch_normalized - minval) / (maxval - minval);
   } else {
-    throw std::runtime_error("Image Type not supported.");
+    LOG(FATAL) << "Image Type not supported.";
   }
   cv::Mat img_gray;
   cv::resize(patch_normalized, img_gray, cv::Size(0, 0), upsample_factor, upsample_factor,
@@ -65,9 +62,8 @@ inline void concatenatePatches(std::vector<cv::Mat> patches, cv::Mat* result_rgb
 
   *result_rgb = cv::Mat(height, n * width, CV_32FC3);
   for (size_t i = 0; i < n; ++i) {
-    if (width != patches[i].cols || height != patches[i].rows) {
-      throw std::runtime_error("Patches have different sizes.");
-    }
+    CHECK_EQ(width, patches[i].cols);
+    CHECK_EQ(height, patches[i].rows);
     cv::Mat roi(*result_rgb, cv::Rect(i * width, 0, width, height));
     cv::Mat patch_rgb(patches[i].size(), CV_32FC3);
     cv::cvtColor(patches[i], patch_rgb, cv::COLOR_GRAY2RGB);

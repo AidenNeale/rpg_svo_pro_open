@@ -6,6 +6,7 @@
 // This file is subject to the terms and conditions defined in the file
 // 'LICENSE', which is part of this source code package.
 
+#include <glog/logging.h>
 #include <kindr/minimal/angle-axis.h>
 #include <svo/common/camera.h>
 #include <svo/common/feature_wrapper.h>
@@ -107,7 +108,7 @@ Matcher::MatchResult Matcher::findMatchDirect(const Frame& ref_frame, const Fram
       f_cur_.normalize();
       return MatchResult::kSuccess;
     } else {
-      std::cout << "NOT CONVERGED: search level " << search_level_;
+      VLOG(300) << "NOT CONVERGED: search level " << search_level_;
     }
   }
   return MatchResult::kFailAlignment;

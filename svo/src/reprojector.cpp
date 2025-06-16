@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include <svo/common/camera.h>
 #include <svo/common/frame.h>
 #include <svo/common/occupancy_grid_2d.h>
@@ -26,9 +27,7 @@ void Reprojector::reprojectFrames(const FramePtr& cur_frame,
   const size_t max_n_fixed_lm =
       (options_.use_kfs_from_global_map ? options_.max_fixed_landmarks : 0u);
   const size_t max_total_n_features = options_.max_n_features_per_frame + max_n_fixed_lm;
-  if (options_.max_n_features_per_frame <= 0u) {
-    throw std::runtime_error("Reprojector: max_n_features_per_frame must be greater than 0.");
-  }
+  CHECK_GT(options_.max_n_features_per_frame, 0u);
   cur_frame->resizeFeatureStorage(max_total_n_features);
 
   // Initialize grid
@@ -59,11 +58,7 @@ void Reprojector::reprojectFrames(const FramePtr& cur_frame,
           continue;
         }
         const PointPtr& point = ref_frame->landmark_vec_[i];
-        if (!point) {
-          throw std::runtime_error("Reprojector: Fixed landmark is null in frame " +
-                                   std::to_string(ref_frame->id_) + " at index " +
-                                   std::to_string(i));
-        }
+        CHECK(point);
 
         if (point->n_failed_reproj_ >= 3 &&
             point->n_succeeded_reproj_ < 3 * point->n_failed_reproj_) {
@@ -81,7 +76,7 @@ void Reprojector::reprojectFrames(const FramePtr& cur_frame,
         }
       }
     }
-    std::cout << "Landmark from global map candidates num: " << candidates_.size() << std::endl;
+    VLOG(10) << "Landmark from global map candidates num: " << candidates_.size() << std::endl;
     using SucFailN = std::array<int, 2>;
     std::vector<std::pair<PointPtr, SucFailN>> old_proj_info;
     for (const auto& c : candidates_) {
@@ -94,9 +89,9 @@ void Reprojector::reprojectFrames(const FramePtr& cur_frame,
                                        options_.affine_est_offset, options_.affine_est_gain,
                                        candidates_, *fixed_landmark_grid_, fixed_lm_stats_,
                                        options_.seed_sigma2_thresh);
-    std::cout << "Reproject landmarks from global map in cam-" << camera_index_
-              << ": trials = " << fixed_lm_stats_.n_trials
-              << ", matches = " << fixed_lm_stats_.n_matches << std::endl;
+    VLOG(10) << "Reproject landmarks from global map in cam-" << camera_index_
+             << ": trials = " << fixed_lm_stats_.n_trials
+             << ", matches = " << fixed_lm_stats_.n_matches << std::endl;
     if (fixed_lm_stats_.n_matches == 0) {
       for (const auto& s_f_info : old_proj_info) {
         s_f_info.first->n_succeeded_reproj_ = s_f_info.second[0];
@@ -146,15 +141,15 @@ void Reprojector::reprojectFrames(const FramePtr& cur_frame,
   }
 
   Statistics lm_stats;
-  std::cout << "Landmark candidates num: " << candidates_.size() << std::endl;
+  VLOG(10) << "Landmark candidates num: " << candidates_.size() << std::endl;
   reprojector_utils::sortCandidatesByReprojStats(candidates_);
   reprojector_utils::matchCandidates(cur_frame, max_total_n_features, options_.affine_est_offset,
                                      options_.affine_est_gain, candidates_, *grid_, lm_stats,
                                      options_.seed_sigma2_thresh);
-  std::cout << "After projection: remaining landmark candidates num: " << candidates_.size()
-            << std::endl;
-  std::cout << "Reproject landmarks in cam-" << camera_index_ << ": trials = " << lm_stats.n_trials
-            << ", matches = " << lm_stats.n_matches;
+  VLOG(10) << "After projection: remaining landmark candidates num: " << candidates_.size()
+           << std::endl;
+  VLOG(5) << "Reproject landmarks in cam-" << camera_index_ << ": trials = " << lm_stats.n_trials
+          << ", matches = " << lm_stats.n_matches;
   stats_.add(lm_stats);
 
   // if we have enough landmarks, we still need to set the grid occupancy
@@ -186,15 +181,15 @@ void Reprojector::reprojectFrames(const FramePtr& cur_frame,
     return;
   }
   Statistics sd_stats;
-  std::cout << "Converged seed candidates num " << candidates_.size() << std::endl;
+  VLOG(10) << "Converged seed candidates num " << candidates_.size() << std::endl;
   reprojector_utils::sortCandidatesByReprojStats(candidates_);
   reprojector_utils::matchCandidates(cur_frame, max_total_n_features, options_.affine_est_offset,
                                      options_.affine_est_gain, candidates_, *grid_, sd_stats,
                                      options_.seed_sigma2_thresh);
-  std::cout << "After projection:"
-            << " remaining converged seed candidates num " << candidates_.size() << std::endl;
-  std::cout << "Reproject converged seeds in cam-" << camera_index_
-            << ": trials = " << sd_stats.n_trials << ", matches = " << sd_stats.n_matches;
+  VLOG(10) << "After projection:"
+           << " remaining converged seed candidates num " << candidates_.size() << std::endl;
+  VLOG(5) << "Reproject converged seeds in cam-" << camera_index_
+          << ": trials = " << sd_stats.n_trials << ", matches = " << sd_stats.n_matches;
   stats_.add(sd_stats);
 
   if (doesFrameHaveEnoughFeatures(cur_frame) || !options_.reproject_unconverged_seeds) {
@@ -216,7 +211,7 @@ void Reprojector::reprojectFrames(const FramePtr& cur_frame,
     }
   }
   Statistics un_sd_stats;
-  std::cout << "Unconverged seeds candidates num " << candidates_.size() << std::endl;
+  VLOG(10) << "Unconverged seeds candidates num " << candidates_.size() << std::endl;
   size_t max_allowed_total = max_total_n_features;
   if (options_.max_unconverged_seeds_ratio > 0) {
     const double min_lm_seeds_ratio = 1 - options_.max_unconverged_seeds_ratio;
@@ -229,16 +224,16 @@ void Reprojector::reprojectFrames(const FramePtr& cur_frame,
   if (max_allowed_total < options_.min_required_features) {
     max_allowed_total = options_.min_required_features;
   }
-  std::cout << "Maximum allowed unconverged seeds are " << max_allowed_total;
+  VLOG(10) << "Maximum allowed unconverged seeds are " << max_allowed_total;
   reprojector_utils::sortCandidatesByReprojStats(candidates_);
   reprojector_utils::matchCandidates(cur_frame, max_allowed_total, options_.affine_est_offset,
                                      options_.affine_est_gain, candidates_, *grid_, un_sd_stats,
                                      options_.seed_sigma2_thresh);
-  std::cout << "After projection: "
-               "remaining unconverged seeds candidates num "
-            << candidates_.size() << std::endl;
-  std::cout << "Update unconverged seeds in cam-" << camera_index_
-            << ": trials = " << un_sd_stats.n_trials << ", success = " << un_sd_stats.n_matches;
+  VLOG(10) << "After projection: "
+              "remaining unconverged seeds candidates num "
+           << candidates_.size() << std::endl;
+  VLOG(5) << "Update unconverged seeds in cam-" << camera_index_
+          << ": trials = " << un_sd_stats.n_trials << ", success = " << un_sd_stats.n_matches;
   stats_.add(un_sd_stats);
 
   if (doesFrameHaveEnoughFeatures(cur_frame)) {
@@ -246,7 +241,7 @@ void Reprojector::reprojectFrames(const FramePtr& cur_frame,
   }
   const double un_sd_ratio = (1.0 * un_sd_stats.n_matches) / stats_.n_matches;
   if (un_sd_ratio > 0.2) {
-    std::cerr << "More than 20% matches are unconverged seeds: " << un_sd_ratio * 100 << "%";
+    LOG(WARNING) << "More than 20% matches are unconverged seeds: " << un_sd_ratio * 100 << "%";
   }
 }
 
@@ -308,13 +303,8 @@ bool matchCandidate(const FramePtr& frame, Reprojector::Candidate& c, Matcher& m
   GradientVector grad_ref;
 
   // direct matching
-  if (!c.ref_frame) {
-    throw std::invalid_argument(
-        "Reprojector: Candidate reference frame is null. This should not happen.");
-  }
-  if (c.ref_index >= c.ref_frame->num_features_) {
-    throw std::out_of_range("Reprojector: Candidate reference index is out of range.");
-  }
+  CHECK_NOTNULL(c.ref_frame.get());
+  CHECK_LT(c.ref_index, c.ref_frame->num_features_);
   int track_id = -1;
   if (c.ref_frame->landmark_vec_.at(c.ref_index) == nullptr) {
     FeatureWrapper ref_ftr = c.ref_frame->getFeatureWrapper(c.ref_index);
@@ -329,7 +319,7 @@ bool matchCandidate(const FramePtr& frame, Reprojector::Candidate& c, Matcher& m
         return false;
       }
     } else {
-      throw std::runtime_error("Seed type unknown");
+      CHECK(false) << "Seed type unknown";
     }
 
     grad_ref = ref_ftr.grad;
@@ -344,10 +334,7 @@ bool matchCandidate(const FramePtr& frame, Reprojector::Candidate& c, Matcher& m
       return false;
     }
     FeatureWrapper ref_ftr = ref_frame->getFeatureWrapper(ref_feature_index);
-    if (!ref_ftr.landmark) {
-      throw std::runtime_error(
-          "Reprojector: Reference feature does not have a landmark. This should not happen.");
-    }
+    CHECK_NOTNULL(ref_ftr.landmark.get());  // debug
     const FloatType ref_depth = (ref_frame->pos() - ref_ftr.landmark->pos()).norm();
     Matcher::MatchResult res =
         matcher.findMatchDirect(*ref_frame, *frame, ref_ftr, ref_depth, c.cur_px);
@@ -421,9 +408,7 @@ bool getCandidate(const FramePtr& cur_frame, const FramePtr& ref_frame, const si
 
 bool projectPointAndCheckVisibility(const FramePtr& frame, const Eigen::Vector3d& xyz,
                                     Eigen::Vector2d* px) {
-  if (!px) {
-    throw std::invalid_argument("Reprojector: px pointer is null.");
-  }
+  CHECK_NOTNULL(px);
 
   // compute where the point projects and check visibility
   // TODO: insert reasonable clipping distance
@@ -477,18 +462,18 @@ void reprojectMapPoints(const FramePtr& frame, const std::vector<FramePtr>& over
     }
   }
 
-  std::cout << "Map points count: " << std::endl
-            << " - map point: " << n_map_point << std::endl
-            << " - converged map point seed: " << n_converge_map_point_seed << std::endl
-            << " - map point seed: " << n_map_point_seed;
+  VLOG(5) << "Map points count: " << std::endl
+          << " - map point: " << n_map_point << std::endl
+          << " - converged map point seed: " << n_converge_map_point_seed << std::endl
+          << " - map point seed: " << n_map_point_seed;
 
   reprojector_utils::sortCandidatesByReprojStats(candidates);
   reprojector_utils::matchCandidates(
       frame, options.max_n_features_per_frame + options.max_map_features_per_frame,
       options.affine_est_offset, options.affine_est_gain, candidates, *grid, stats);
 
-  std::cout << "Reproject landmarks "
-            << ": trials = " << stats.n_trials << ", matches = " << stats.n_matches;
+  VLOG(5) << "Reproject landmarks "
+          << ": trials = " << stats.n_trials << ", matches = " << stats.n_matches;
 }
 
 }  // namespace reprojector_utils

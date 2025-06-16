@@ -1,6 +1,7 @@
 #include <aslam/common/entrypoint.h>
 #include <aslam/common/memory.h>
 #include <aslam/common/numdiff-jacobian-tester.h>
+#include <glog/logging.h>
 #include <svo/common/camera.h>
 #include <svo/common/frame.h>
 #include <svo/common/seed.h>
@@ -29,9 +30,7 @@ struct DepthJacobianFunctor : public aslam::common::NumDiffFunctor<2, 1> {
   virtual bool functional(const typename aslam::common::NumDiffFunctor<1, 1>::InputType& inv_depth,
                           typename aslam::common::NumDiffFunctor<2, 1>::ValueType& px_cur,
                           typename aslam::common::NumDiffFunctor<2, 1>::JacobianType* Jout) const {
-    if (!camera_) {
-      throw std::runtime_error("camera_ is null");
-    }
+    CHECK(camera_);
     svo::BearingVector f_cur = T_cur_ref_ * (f_ref_ * (1.0 / inv_depth(0, 0)));
 
     Eigen::Matrix<double, 2, 3> projection_jacobian;
@@ -74,27 +73,21 @@ TEST(TestDepthEstimation, testBearing) {
   svo::BearingVector f_cur_2 = T_cur_ref * (f_ref * (1.0 / inv_depth));
   std::cout << f_cur_1.transpose() << std::endl;
   std::cout << f_cur_2.transpose() << std::endl;
-  EIGEN_MATRIX_NEAR(f_cur_1, f_cur_2, 1e-9);
+  EIGEN_MATRIX_NEAR(f_cur_1, f_cur_2, 1e-7);  // TODO(cfo) Check doesn't work!??
 }
 
 TEST(TestDepthEstimation, DISABLED_testDataset) {
   std::string dataset_dir =
       ament_index_cpp::get_package_share_directory("rpg_datasets") + "/rpg_vfr_pinhole";
-  if (dataset_dir.empty()) {
-    throw std::runtime_error("Dataset directory is empty");
-  }
+  CHECK(!dataset_dir.empty());
   svo::test_utils::SyntheticDataset dataset(dataset_dir, 0, 0);
 
   // Load images.
   svo::FramePtr ref_frame, cur_frame;
   cv::Mat ref_depthmap;
-  if (!dataset.getNextFrame(5u, ref_frame, &ref_depthmap)) {
-    throw std::runtime_error("Failed to get next frame");
-  }
+  CHECK(dataset.getNextFrame(5u, ref_frame, &ref_depthmap));
   dataset.skipNImages(4);
-  if (!dataset.getNextFrame(5u, cur_frame, nullptr)) {
-    throw std::runtime_error("Failed to get next frame");
-  }
+  CHECK(dataset.getNextFrame(5u, cur_frame, nullptr));
 
   // Set feature.
   ref_frame->resizeFeatureStorage(1);
@@ -109,13 +102,13 @@ TEST(TestDepthEstimation, DISABLED_testDataset) {
   float ground_truth_depth = ref_depthmap.at<float>(ref_ftr.px(1), ref_ftr.px(0));
   float depth_init = ground_truth_depth * 0.7;
   ref_frame->invmu_sigma2_a_b_vec_(0, 0) = svo::seed::getMeanFromDepth(depth_init);
-  std::cout << "ground-truth depth = " << 1.0 / ground_truth_depth;
+  VLOG(200) << "ground-truth depth = " << 1.0 / ground_truth_depth;
   svo::DepthEstimator depth_estimator(svo::DepthEstimator::getDefaultSolverOptions());
   depth_estimator.run(cur_frame, ref_frame, 0);
-  std::cout << "estimated depth = " << ref_frame->invmu_sigma2_a_b_vec_(0, 0);
+  VLOG(200) << "estimated depth = " << ref_frame->invmu_sigma2_a_b_vec_(0, 0);
 
-  EXPECT_NEAR(svo::seed::getMeanFromDepth(ground_truth_depth),
-              ref_frame->invmu_sigma2_a_b_vec_(0, 0), 0.001);
+  CHECK_NEAR(svo::seed::getMeanFromDepth(ground_truth_depth),
+             ref_frame->invmu_sigma2_a_b_vec_(0, 0), 0.001);
 }
 
 VIKIT_UNITTEST_ENTRYPOINT

@@ -1,4 +1,7 @@
 #include <gflags/gflags.h>
+#include <glog/logging.h>
+
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 // svo
 #include <svo/common/camera.h>
@@ -10,8 +13,6 @@
 #include <svo/direct/patch_utils.h>
 #include <svo/direct/patch_warp.h>
 #include <svo/test_utils/synthetic_dataset.h>
-
-#include <ament_index_cpp/get_package_share_directory.hpp>
 
 // others
 #include <opencv2/highgui/highgui.hpp>  // imread
@@ -304,6 +305,9 @@ void test() {
 }  // namespace
 
 int main(int argc, char** argv) {
+  google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+
   test();
 
   return 0;

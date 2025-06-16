@@ -1,3 +1,5 @@
+#include <glog/logging.h>
+
 #include <stdexcept>
 
 #include "vikit/solver/mini_least_squares_solver.h"
@@ -56,14 +58,14 @@ void MiniLeastSquaresSolver<D, T, Implementation>::optimizeGaussNewton(State& st
 
     // solve the linear system
     if (!solve(H_, g_, dx_)) {
-      std::cout << "Matrix is close to singular! Stop Optimizing."
-                << "H = " << H_ << "g = " << g_;
+      LOG(WARNING) << "Matrix is close to singular! Stop Optimizing."
+                   << "H = " << H_ << "g = " << g_;
       stop_ = true;
     }
 
     // check if error increased since last optimization
     if ((iter_ > 0 && new_chi2 > chi2_ && solver_options_.stop_when_error_increases) || stop_) {
-      std::cout << "It. " << iter_ << "\t Failure"
+      VLOG(400) << "It. " << iter_ << "\t Failure"
                 << "\t new_chi2 = " << new_chi2 << "\t n_meas = " << n_meas_
                 << "\t Error increased. Stop optimizing.";
       state = old_state;  // rollback
@@ -77,14 +79,14 @@ void MiniLeastSquaresSolver<D, T, Implementation>::optimizeGaussNewton(State& st
     state = new_state;
     chi2_ = new_chi2;
     double x_norm = utils::norm_max(dx_);
-    std::cout << "It. " << iter_ << "\t Success"
+    VLOG(400) << "It. " << iter_ << "\t Success"
               << "\t new_chi2 = " << new_chi2 << "\t n_meas = " << n_meas_
               << "\t x_norm = " << x_norm;
     finishIteration();
 
     // stop when converged, i.e. update step too small
     if (x_norm < solver_options_.eps) {
-      std::cout << "Converged, x_norm " << x_norm << " < " << solver_options_.eps;
+      VLOG(400) << "Converged, x_norm " << x_norm << " < " << solver_options_.eps;
       break;
     }
   }
@@ -98,7 +100,7 @@ void MiniLeastSquaresSolver<D, T, Implementation>::optimizeLevenbergMarquardt(St
 
   // compute the initial error
   chi2_ = evaluateError(state, nullptr, nullptr);
-  std::cout << "init chi2 = " << chi2_ << "\t n_meas = " << n_meas_;
+  VLOG(400) << "init chi2 = " << chi2_ << "\t n_meas = " << n_meas_;
 
   // TODO: compute initial lambda
   // Hartley and Zisserman: "A typical init value of lambda is 10^-3 times the
@@ -162,7 +164,7 @@ void MiniLeastSquaresSolver<D, T, Implementation>::optimizeLevenbergMarquardt(St
         stop_ = utils::norm_max(dx_) < solver_options_.eps;
         mu_ *= std::max(1. / 3., std::min(1. - std::pow(2 * rho_ - 1, 3), 2. / 3.));
         nu_ = 2.;
-        std::cout << "It. " << iter_ << "\t Trial " << trials_ << "\t Success"
+        VLOG(400) << "It. " << iter_ << "\t Trial " << trials_ << "\t Success"
                   << "\t n_meas = " << n_meas_ << "\t new_chi2 = " << new_chi2 << "\t mu = " << mu_
                   << "\t nu = " << nu_;
       } else {
@@ -172,7 +174,7 @@ void MiniLeastSquaresSolver<D, T, Implementation>::optimizeLevenbergMarquardt(St
         ++trials_;
         if (trials_ >= solver_options_.max_trials) stop_ = true;
 
-        std::cout << "It. " << iter_ << "\t Trial " << trials_ << "\t Failure"
+        VLOG(400) << "It. " << iter_ << "\t Trial " << trials_ << "\t Failure"
                   << "\t n_meas = " << n_meas_ << "\t new_chi2 = " << new_chi2 << "\t mu = " << mu_
                   << "\t nu = " << nu_;
       }

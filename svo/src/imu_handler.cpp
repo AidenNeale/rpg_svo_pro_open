@@ -7,12 +7,12 @@
 // 'LICENSE', which is part of this source code package.
 #include "svo/imu_handler.h"
 
+#include <glog/logging.h>
 #include <vikit/csv_utils.h>
 #include <vikit/math_utils.h>
 #include <vikit/timer.h>
 
 #include <numeric>
-#include <thread>
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include <yaml-cpp/yaml.h>
 #pragma diagnostic pop
@@ -91,7 +91,7 @@ bool ImuHandler::getMeasurementsContainingEdges(const double frame_timestamp,  /
                                                 const bool remove_measurements) {
   ulock_t lock(measurements_mut_);
   if (measurements_.empty()) {
-    std::cerr << "don't have any imu measurements!";
+    LOG(WARNING) << "don't have any imu measurements!";
     return false;
   }
 
@@ -104,7 +104,7 @@ bool ImuHandler::getMeasurementsContainingEdges(const double frame_timestamp,  /
   for (; it != measurements_.end(); ++it) {
     if (it->timestamp_ < t) {
       if (it == measurements_.begin()) {
-        std::cerr << "need a newer measurement for interpolation!";
+        LOG(WARNING) << "need a newer measurement for interpolation!";
         return false;
       }
       // decrement iterator again to point to element >= t
@@ -118,7 +118,7 @@ bool ImuHandler::getMeasurementsContainingEdges(const double frame_timestamp,  /
 
   // check
   if (extracted_measurements.size() < 2) {
-    std::cerr << "need older imu measurements!";
+    LOG(WARNING) << "need older imu measurements!";
     extracted_measurements.clear();
     return false;
   }
@@ -139,7 +139,7 @@ bool ImuHandler::getMeasurements(const double old_cam_timestamp, const double ne
   assert(new_cam_timestamp > old_cam_timestamp);
   ulock_t lock(measurements_mut_);
   if (measurements_.empty()) {
-    std::cerr << "don't have any imu measurements!";
+    LOG(WARNING) << "don't have any imu measurements!";
     return false;
   }
 
@@ -166,22 +166,22 @@ bool ImuHandler::getMeasurements(const double old_cam_timestamp, const double ne
 
   // check
   if (it1 == measurements_.end()) {
-    std::cerr << "need an older measurement for t1!";
+    LOG(WARNING) << "need an older measurement for t1!";
     return false;
   }
 
   if (it2 == measurements_.end()) {
-    std::cerr << "need an older measurement for t2!";
+    LOG(WARNING) << "need an older measurement for t2!";
     return false;
   }
 
   if (it1 == it2) {
-    std::cerr << "not enough imu measurements!";
+    LOG(WARNING) << "not enough imu measurements!";
     return false;
   }
 
   if (t2 - it2->timestamp_ > imu_calib_.max_imu_delta_t) {
-    std::cerr << "newest imu measurement is too old for the image " << t2 - it2->timestamp_;
+    LOG(WARNING) << "newest imu measurement is too old for the image " << t2 - it2->timestamp_;
     return false;
   }
 
@@ -203,7 +203,7 @@ bool ImuHandler::getMeasurements(const double old_cam_timestamp, const double ne
 bool ImuHandler::getClosestMeasurement(const double timestamp, ImuMeasurement& measurement) const {
   ulock_t lock(measurements_mut_);
   if (measurements_.empty()) {
-    std::cerr << "ImuHandler: don't have any imu measurements!";
+    LOG(WARNING) << "ImuHandler: don't have any imu measurements!";
     return false;
   }
 
@@ -218,9 +218,9 @@ bool ImuHandler::getClosestMeasurement(const double timestamp, ImuMeasurement& m
   }
 
   if (dt_best > imu_calib_.max_imu_delta_t) {
-    std::cerr << "ImuHandler: getClosestMeasurement: no measurement found!"
-                 " closest measurement: "
-              << dt_best * 1000.0 << "ms.";
+    LOG(WARNING) << "ImuHandler: getClosestMeasurement: no measurement found!"
+                    " closest measurement: "
+                 << dt_best * 1000.0 << "ms.";
     return false;
   }
   return true;
@@ -265,7 +265,7 @@ bool ImuHandler::loadImuMeasurementsFromFile(const std::string& filename) {
   ulock_t lock(measurements_mut_);
   std::ifstream fs(filename.c_str());
   if (!fs.is_open()) {
-    std::cerr << "Could not open imu file: " << filename;
+    LOG(WARNING) << "Could not open imu file: " << filename;
     return false;
   }
 
@@ -292,7 +292,7 @@ bool ImuHandler::loadImuMeasurementsFromFile(const std::string& filename) {
     }
     ++n;
   }
-  std::cout << "ImuHandler: Loaded " << n << " measurements.";
+  VLOG(2) << "ImuHandler: Loaded " << n << " measurements.";
   return true;
 }
 
@@ -301,13 +301,8 @@ bool ImuHandler::loadImuMeasurementsFromCsvFile(const std::string& filename) {
 
   // open file
   std::ifstream csv_file_stream(filename, std::ios::in);
-  if (!csv_file_stream.is_open()) {
-    throw std::runtime_error("Failed to open file " + filename + ".");
-  }
-
-  if (csv_file_stream.eof()) {
-    throw std::runtime_error("File empty: " + filename);
-  }
+  CHECK(csv_file_stream.is_open()) << "Failed to open file " << filename << ".";
+  CHECK(!csv_file_stream.eof()) << "File empty: " << filename;
 
   // skip header
   std::string header_line;
@@ -329,7 +324,7 @@ bool ImuHandler::loadImuMeasurementsFromCsvFile(const std::string& filename) {
     ++n;
   }
 
-  std::cout << "ImuHandler: Loaded " << n << " measurements.";
+  VLOG(2) << "ImuHandler: Loaded " << n << " measurements.";
   return true;
 }
 
@@ -348,7 +343,7 @@ ImuCalibration ImuHandler::loadCalibrationFromFile(const std::string& filename) 
     calib.gravity_magnitude = data["imu_params"]["g"].as<double>();
     calib.imu_rate = data["imu_params"]["imu_rate"].as<double>();
   } else {
-    throw std::runtime_error("Could not load IMU calibration from file");
+    LOG(FATAL) << "Could not load IMU calibration from file";
   }
   return calib;
 }
@@ -370,7 +365,7 @@ ImuInitialization ImuHandler::loadInitializationFromFile(const std::string& file
     init.omega_bias_sigma = data["imu_initialization"]["omega_bias_sigma"].as<double>();
     init.acc_bias_sigma = data["imu_initialization"]["acc_bias_sigma"].as<double>();
   } else {
-    throw std::runtime_error("Could not load IMU initialization from file");
+    LOG(FATAL) << "Could not load IMU initialization from file";
   }
   return init;
 }
@@ -393,7 +388,7 @@ bool ImuHandler::getAngularVelocity(double timestamp, Eigen::Vector3d& omega) co
 bool ImuHandler::getInitialAttitude(double timestamp, Quaternion& R_imu_world) const {
   ImuMeasurement m;
   if (!getClosestMeasurement(timestamp, m)) {
-    std::cerr << "ImuHandler: Could not get initial attitude. No measurements!";
+    LOG(WARNING) << "ImuHandler: Could not get initial attitude. No measurements!";
     return false;
   }
 
@@ -412,7 +407,7 @@ bool ImuHandler::getInitialAttitude(double timestamp, Quaternion& R_imu_world) c
   C_imu_world.col(1) = y;
   C_imu_world.col(2) = z;
 
-  std::cout << "Initial Rotation = " << C_imu_world;
+  VLOG(3) << "Initial Rotation = " << C_imu_world;
 
   R_imu_world = Quaternion(C_imu_world);
   return true;
@@ -428,12 +423,8 @@ IMUTemporalStatus ImuHandler::checkTemporalStatus(const double time_sec) {
   IMUTemporalStatus res = IMUTemporalStatus::kMoving;
 
   if (!options_.temporal_stationary_check) {
-    if (temporal_imu_window_.size() != 0u) {
-      throw std::runtime_error(
-          "IMUHandler: temporal stationary check is not enabled, but temporal imu window is not "
-          "empty.");
-    }
-    std::cerr << "Stationary check is not enabled. Will assume moving.";
+    CHECK_EQ(temporal_imu_window_.size(), 0u);
+    LOG(WARNING) << "Stationary check is not enabled. Will assume moving.";
     return res;
   }
 
@@ -447,10 +438,7 @@ IMUTemporalStatus ImuHandler::checkTemporalStatus(const double time_sec) {
   for (size_t idx = 0; idx < temporal_imu_window_.size(); idx++) {
     if (start_idx == -1 && temporal_imu_window_[idx].timestamp_ < time_sec) {
       // we know the first is not the start point
-      if (idx <= 0u) {
-        throw std::runtime_error(
-            "IMUHandler: temporal stationary check: no IMU measurements before the time point.");
-      }
+      CHECK_GT(idx, 0u);
       start_idx = idx - 1;
       continue;
     }
@@ -509,7 +497,7 @@ bool ImuHandler::waitTill(const double img_timestamp_sec, const double timeout_s
   wait_time.start();
   while (this->getLatestTimestamp() < img_timestamp_sec - this->imu_calib_.delay_imu_cam) {
     if (wait_time.stop() > timeout_sec) {
-      std::cerr << "Did not get IMU measurements";
+      LOG(ERROR) << "Did not get IMU measurements";
       return false;
     }
     wait_time.resume();

@@ -7,6 +7,7 @@
 // 'LICENSE', which is part of this source code package.
 
 #include <fast/fast.h>
+#include <glog/logging.h>
 #include <svo/common/camera.h>
 #include <svo/common/frame.h>
 #include <svo/common/logging.h>
@@ -68,15 +69,9 @@ void fillFeatures(const Corners& corners, const FeatureType& type, const cv::Mat
                   const double& threshold, const size_t max_n_features, Keypoints& keypoints,
                   Scores& scores, Levels& levels, Gradients& gradients, FeatureTypes& types,
                   OccupandyGrid2D& grid) {
-  if (keypoints.cols() != levels.size()) {
-    throw std::runtime_error("keypoints and levels size mismatch");
-  }
-  if (keypoints.cols() != gradients.cols()) {
-    throw std::runtime_error("keypoints and gradients size mismatch");
-  }
-  if (static_cast<size_t>(keypoints.cols()) != types.size()) {
-    throw std::runtime_error("keypoints and types size mismatch");
-  }
+  CHECK_EQ(keypoints.cols(), levels.size());
+  CHECK_EQ(keypoints.cols(), gradients.cols());
+  CHECK_EQ(static_cast<size_t>(keypoints.cols()), types.size());
 
   // copy new features in temporary vectors
   aslam::Aligned<std::vector, Keypoint>::type keypoint_vec;
@@ -133,12 +128,8 @@ void fillFeatures(const Corners& corners, const FeatureType& type, const cv::Mat
 void fastDetector(const ImgPyr& img_pyr, const int threshold, const int border,
                   const size_t min_level, const size_t max_level, Corners& corners,
                   OccupandyGrid2D& grid) {
-  if (corners.size() != grid.occupancy_.size()) {
-    throw std::runtime_error("Corners and grid size mismatch");
-  }
-  if (max_level > img_pyr.size() - 1) {
-    throw std::runtime_error("Max level exceeds image pyramid size");
-  }
+  CHECK_EQ(corners.size(), grid.occupancy_.size());
+  CHECK_LE(max_level, img_pyr.size() - 1);
 
   for (size_t level = min_level; level <= max_level; ++level) {
     const int scale = (1 << level);
@@ -178,12 +169,8 @@ void fastDetector(const ImgPyr& img_pyr, const int threshold, const int border,
 void shiTomasiDetector(const ImgPyr& img_pyr, const int threshold, const int border,
                        const size_t min_level, const size_t max_level, Corners& corners,
                        OccupandyGrid2D& grid, OccupandyGrid2D& closeness_check_grid) {
-  if (corners.size() != grid.occupancy_.size()) {
-    throw std::runtime_error("Corners and grid size mismatch");
-  }
-  if (max_level > img_pyr.size() - 1) {
-    throw std::runtime_error("Max level exceeds image pyramid size");
-  }
+  CHECK_EQ(corners.size(), grid.occupancy_.size());
+  CHECK_LE(max_level, img_pyr.size() - 1);
 
   for (size_t level = min_level; level <= max_level; ++level) {
     size_t nrows = img_pyr[level].rows;
@@ -231,9 +218,7 @@ void shiTomasiDetector(const ImgPyr& img_pyr, const int threshold, const int bor
 void edgeletDetector_V1(const ImgPyr& img_pyr, const int threshold, const int border,
                         const int min_level, const int max_level, Corners& corners,
                         OccupandyGrid2D& grid) {
-  if (corners.size() != grid.occupancy_.size()) {
-    throw std::runtime_error("Corners and grid size mismatch");
-  }
+  CHECK_EQ(corners.size(), grid.occupancy_.size());
 
   for (int level = min_level + 1; level <= max_level;
        ++level)  // note, we start one level higher, so we already have some smoothing
@@ -272,9 +257,7 @@ void edgeletDetector_V1(const ImgPyr& img_pyr, const int threshold, const int bo
 void edgeletDetector_V2(const ImgPyr& img_pyr, const int threshold, const int border,
                         const int min_level, const int max_level, Corners& corners,
                         OccupandyGrid2D& grid) {
-  if (corners.size() != grid.occupancy_.size()) {
-    throw std::runtime_error("Corners and grid size mismatch");
-  }
+  CHECK_EQ(corners.size(), grid.occupancy_.size());
 
   constexpr int level = 1;
   constexpr int scale = (1 << level);
@@ -336,9 +319,7 @@ void edgeletDetector_V2(const ImgPyr& img_pyr, const int threshold, const int bo
 //------------------------------------------------------------------------------
 bool getCornerAngle(const ImgPyr& img_pyr, const Eigen::Ref<const Keypoint>& px_level_0,
                     const size_t level, double* angle) {
-  if (!angle) {
-    throw std::invalid_argument("angle pointer is null");
-  }
+  CHECK_NOTNULL(angle);
   constexpr int kHalfPatchSize = 2;
   constexpr int kPatchSize = 2 * kHalfPatchSize;
   constexpr int kHalfPatchSizePlusBorder = kHalfPatchSize + 1;
@@ -348,7 +329,7 @@ bool getCornerAngle(const ImgPyr& img_pyr, const Eigen::Ref<const Keypoint>& px_
   if (px(0) < kHalfPatchSizePlusBorder || px(1) < kHalfPatchSizePlusBorder ||
       px(0) >= img.cols - kHalfPatchSizePlusBorder ||
       px(1) >= img.rows - kHalfPatchSizePlusBorder) {
-    std::cerr << "Can't determine corner angle. Patch too close to border. "
+    VLOG(100) << "Can't determine corner angle. Patch too close to border. "
               << "px = " << px.transpose() << ", level = " << level;
     return false;
   }
@@ -368,12 +349,8 @@ bool getCornerAngle(const ImgPyr& img_pyr, const Eigen::Ref<const Keypoint>& px_
 
 //------------------------------------------------------------------------------
 bool getShiTomasiScore(const cv::Mat& img, const Eigen::Vector2i& px, double* score) {
-  if (!score) {
-    throw std::invalid_argument("score pointer is null");
-  }
-  if (img.type() != CV_8UC1) {
-    throw std::invalid_argument("Image type is not CV_8UC1");
-  }
+  CHECK_NOTNULL(score);
+  CHECK(img.type() == CV_8UC1);
   constexpr int kHalfPatchSize = 4;
   constexpr int kPatchSize = 2 * kHalfPatchSize;
   constexpr int kPatchArea = kPatchSize * kPatchSize;
@@ -618,12 +595,8 @@ void detectSobelEdges(const cv::Mat& src_gray, cv::Mat& dest, int low_threshold,
 //------------------------------------------------------------------------------
 void drawFeatures(const Frame& frame, const size_t level, const bool only_matched_features,
                   cv::Mat* img_rgb) {
-  if (!img_rgb) {
-    throw std::invalid_argument("img_rgb pointer is null");
-  }
-  if (frame.img_pyr_.size() <= level) {
-    throw std::out_of_range("level is out of range");
-  }
+  CHECK_NOTNULL(img_rgb);
+  CHECK_GT(frame.img_pyr_.size(), level);
 
   const int scale = (1 << level);
   const int size = (level == 1) ? 2 : 0;
@@ -795,9 +768,7 @@ void nonmax_3x3(const std::vector<Eigen::Vector2i>& corners, const std::vector<i
 }
 
 void mergeGrids(const OccupandyGrid2D& grid1, OccupandyGrid2D* grid2) {
-  if (grid1.occupancy_.size() != grid2->occupancy_.size()) {
-    throw std::invalid_argument("Grids have different sizes");
-  }
+  CHECK(grid1.occupancy_.size() == grid2->occupancy_.size());
   for (size_t i = 0; i < grid1.occupancy_.size(); i++) {
     if (grid2->occupancy_.at(i)) continue;
     grid2->occupancy_.at(i) = grid1.occupancy_.at(i);

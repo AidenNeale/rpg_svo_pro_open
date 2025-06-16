@@ -6,6 +6,7 @@
 // This file is subject to the terms and conditions defined in the file
 // 'LICENSE', which is part of this source code package.
 
+#include <glog/logging.h>
 #include <svo/common/camera.h>
 #include <svo/common/frame.h>
 #include <svo/direct/depth_estimation.h>
@@ -31,18 +32,10 @@ DepthEstimator::SolverOptions DepthEstimator::getDefaultSolverOptions() {
 
 void DepthEstimator::run(const FramePtr& cur_frame, const FramePtr& ref_frame,
                          const int ref_feature_id) {
-  if (ref_frame->invmu_sigma2_a_b_vec_.cols() <= ref_feature_id) {
-    throw std::runtime_error("ref_frame->invmu_sigma2_a_b_vec_.cols() <= ref_feature_id");
-  }
-  if (ref_frame->f_vec_.cols() <= ref_feature_id) {
-    throw std::runtime_error("ref_frame->f_vec_.cols() <= ref_feature_id");
-  }
-  if (ref_frame->img_pyr_.size() <= static_cast<size_t>(kMaxLevel)) {
-    throw std::runtime_error("ref_frame->img_pyr_.size() <= static_cast<size_t>(kMaxLevel)");
-  }
-  if (cur_frame->img_pyr_.size() <= static_cast<size_t>(kMaxLevel)) {
-    throw std::runtime_error("cur_frame->img_pyr_.size() <= static_cast<size_t>(kMaxLevel)");
-  }
+  CHECK_GT(ref_frame->invmu_sigma2_a_b_vec_.cols(), ref_feature_id);
+  CHECK_GT(ref_frame->f_vec_.cols(), ref_feature_id);
+  CHECK_GT(ref_frame->img_pyr_.size(), static_cast<size_t>(kMaxLevel));
+  CHECK_GT(cur_frame->img_pyr_.size(), static_cast<size_t>(kMaxLevel));
 
   cur_frame_ = cur_frame;
   ref_frame_ = ref_frame;
@@ -52,7 +45,7 @@ void DepthEstimator::run(const FramePtr& cur_frame, const FramePtr& ref_frame,
 
   double state = ref_frame_->invmu_sigma2_a_b_vec_(0, ref_feature_id);
   for (level_ = kMaxLevel; level_ >= kMinLevel; --level_) {
-    std::cout << "=== Pyramid Level " << level_ << " ===";
+    VLOG(100) << "=== Pyramid Level " << level_ << " ===";
     mu_ = 0.1;
     optimize(state);
   }
@@ -68,7 +61,7 @@ double DepthEstimator::evaluateError(const DepthEstimatorState& inverse_depth, H
   Eigen::Matrix<double, 2, 3> projection_jacobian;
   cur_frame_->cam_->project3(f_cur, &px_cur, &projection_jacobian);
   if (!cur_frame_->cam_->isKeypointVisibleWithMargin(px_cur, (kPatchHalfsize + 3) * level_)) {
-    std::cout << "Depth Estimation: Cur-Patch out of image."
+    VLOG(200) << "Depth Estimation: Cur-Patch out of image."
               << " px_cur_pyr = (" << (px_cur / (1 << level_)).transpose() << "), img_size = ("
               << cur_frame_->img_pyr_[level_].cols << " x " << cur_frame_->img_pyr_[level_].rows
               << ")";
@@ -82,7 +75,7 @@ double DepthEstimator::evaluateError(const DepthEstimatorState& inverse_depth, H
                             &A_cur_ref);
   if (!warp::warpAffine(A_cur_ref, ref_frame_->img_pyr_[level_], px_ref_, level_, level_,
                         kPatchHalfsize + 1, ref_patch_with_border_)) {
-    std::cout << "Depth Estimation: Ref-Patch out of image:"
+    VLOG(200) << "Depth Estimation: Ref-Patch out of image:"
               << " px_ref_pyr = " << (px_ref_ / (1 << level_)).transpose() << "), img_size = ("
               << cur_frame_->img_pyr_[level_].cols << " x " << cur_frame_->img_pyr_[level_].rows
               << ")";
@@ -95,26 +88,26 @@ double DepthEstimator::evaluateError(const DepthEstimatorState& inverse_depth, H
   warp::createPatchNoWarpInterpolated(cur_frame_->img_pyr_[level_], px_cur_vec, kPatchHalfsize + 1,
                                       cur_patch_with_border);
 
-  // if (VLOG_IS_ON(200)) {
-  //   cv::Mat img_cur_rgb(cur_frame_->img_pyr_[level_].size(), CV_8UC3);
-  //   cv::cvtColor(cur_frame_->img_pyr_[level_], img_cur_rgb, cv::COLOR_GRAY2RGB);
-  //   cv::Mat img_ref_rgb(ref_frame_->img_pyr_[level_].size(), CV_8UC3);
-  //   cv::cvtColor(ref_frame_->img_pyr_[level_], img_ref_rgb, cv::COLOR_GRAY2RGB);
-  //   const Eigen::Vector2d px_ref_vec = px_ref_ / (1 << level_);
-  //   cv::rectangle(img_cur_rgb,
-  //                 cv::Rect(px_cur_vec(0), px_cur_vec(1), kPatchSize + 3, kPatchSize + 3),
-  //                 cv::Scalar(0, 255, 1));
-  //   cv::rectangle(img_ref_rgb,
-  //                 cv::Rect(px_ref_vec(0), px_ref_vec(1), kPatchSize + 3, kPatchSize + 3),
-  //                 cv::Scalar(0, 255, 1));
-  //   cv::imshow("img_cur_rgb", img_cur_rgb);
-  //   cv::imshow("img_ref_rgb", img_ref_rgb);
-  //   cv::Mat img_cur(kPatchSize + 2, kPatchSize + 2, CV_8UC1, cur_patch_with_border);
-  //   cv::Mat img_ref(kPatchSize + 2, kPatchSize + 2, CV_8UC1, ref_patch_with_border_);
-  //   cv::imshow("patch_cur", img_cur);
-  //   cv::imshow("patch_ref", img_ref);
-  //   cv::waitKey(0);
-  // }
+  if (VLOG_IS_ON(200)) {
+    cv::Mat img_cur_rgb(cur_frame_->img_pyr_[level_].size(), CV_8UC3);
+    cv::cvtColor(cur_frame_->img_pyr_[level_], img_cur_rgb, cv::COLOR_GRAY2RGB);
+    cv::Mat img_ref_rgb(ref_frame_->img_pyr_[level_].size(), CV_8UC3);
+    cv::cvtColor(ref_frame_->img_pyr_[level_], img_ref_rgb, cv::COLOR_GRAY2RGB);
+    const Eigen::Vector2d px_ref_vec = px_ref_ / (1 << level_);
+    cv::rectangle(img_cur_rgb,
+                  cv::Rect(px_cur_vec(0), px_cur_vec(1), kPatchSize + 3, kPatchSize + 3),
+                  cv::Scalar(0, 255, 1));
+    cv::rectangle(img_ref_rgb,
+                  cv::Rect(px_ref_vec(0), px_ref_vec(1), kPatchSize + 3, kPatchSize + 3),
+                  cv::Scalar(0, 255, 1));
+    cv::imshow("img_cur_rgb", img_cur_rgb);
+    cv::imshow("img_ref_rgb", img_ref_rgb);
+    cv::Mat img_cur(kPatchSize + 2, kPatchSize + 2, CV_8UC1, cur_patch_with_border);
+    cv::Mat img_ref(kPatchSize + 2, kPatchSize + 2, CV_8UC1, ref_patch_with_border_);
+    cv::imshow("patch_cur", img_cur);
+    cv::imshow("patch_ref", img_ref);
+    cv::waitKey(0);
+  }
 
   double chi2 = 0.0;
   const int patch_step = kPatchSize + 2;

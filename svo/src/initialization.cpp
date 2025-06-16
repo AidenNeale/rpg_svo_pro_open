@@ -88,13 +88,14 @@ bool AbstractInitialization::trackFeaturesAndCheckDisparity(const FrameBundlePtr
   const size_t num_tracked_tot = std::accumulate(num_tracked.begin(), num_tracked.end(), 0u);
   const double avg_disparity =
       std::accumulate(disparity.begin(), disparity.end(), 0.0) / disparity.size();
-  std::cout << "Init: Tracked " << num_tracked_tot
-            << " features with disparity = " << avg_disparity;
+  VLOG(3) << "Init: Tracked " << num_tracked_tot << " features with disparity = " << avg_disparity;
   if (num_tracked_tot < options_.init_min_features) {
     tracker_->resetActiveTracks();
-    for (const FramePtr& frame : frames->frames_) frame->clearFeatureStorage();
+    for (const FramePtr& frame : frames->frames_) {
+      frame->clearFeatureStorage();
+    }
     const size_t n = tracker_->initializeNewTracks(frames);
-    std::cout << "Init: New Tracks initialized = " << n;
+    VLOG(3) << "Init: New Tracks initialized = " << n;
     frames_ref_ = frames;
     R_ref_world_ = R_cur_world_;
     return false;
@@ -238,13 +239,13 @@ InitResult TwoPointInit::addFrameBundle(const FrameBundlePtr& frames_cur) {
   Matrix3d R = ransac.model_coefficients_.leftCols(3);
   T_cur_from_ref_ = Transformation(Quaternion(R), ransac.model_coefficients_.rightCols(1));
 
-  std::cout << "2Pt RANSAC:" << std::endl
-            << "# Iter = " << ransac.iterations_ << std::endl
-            << "# Inliers = " << ransac.inliers_.size() << std::endl
-            << "Model = " << ransac.model_coefficients_ << std::endl
-            << "Rot prior (imu) = " << R_cur_ref << std::endl
-            << "H.rotation_matrix() = " << T_cur_from_ref_.getRotationMatrix() << std::endl
-            << "H.translation() = " << T_cur_from_ref_.getPosition();
+  VLOG(5) << "2Pt RANSAC:" << std::endl
+          << "# Iter = " << ransac.iterations_ << std::endl
+          << "# Inliers = " << ransac.inliers_.size() << std::endl
+          << "Model = " << ransac.model_coefficients_ << std::endl
+          << "Rot prior (imu) = " << R_cur_ref << std::endl
+          << "H.rotation_matrix() = " << T_cur_from_ref_.getRotationMatrix() << std::endl
+          << "H.translation() = " << T_cur_from_ref_.getPosition();
 
   // Triangulate
   if (initialization_utils::triangulateAndInitializePoints(
@@ -293,8 +294,8 @@ InitResult FivePointInit::addFrameBundle(const FrameBundlePtr& frames_cur) {
 
   // enough inliers?
   if (ransac.inliers_.size() < options_.init_min_inliers) {
-    std::cout << "5Pt RANSAC has only " << ransac.inliers_.size() << " inliers. "
-              << options_.init_min_inliers << " required.";
+    VLOG(3) << "5Pt RANSAC has only " << ransac.inliers_.size() << " inliers. "
+            << options_.init_min_inliers << " required.";
     return InitResult::kNoKeyframe;
   }
 
@@ -302,12 +303,12 @@ InitResult FivePointInit::addFrameBundle(const FrameBundlePtr& frames_cur) {
   Matrix3d R = ransac.model_coefficients_.leftCols(3);
   T_cur_from_ref_ = Transformation(Quaternion(R), ransac.model_coefficients_.rightCols(1));
 
-  std::cout << "5Pt RANSAC:" << std::endl
-            << "# Iter = " << ransac.iterations_ << std::endl
-            << "# Inliers = " << ransac.inliers_.size() << std::endl
-            << "Model = " << ransac.model_coefficients_ << std::endl
-            << "T.rotation_matrix() = " << T_cur_from_ref_.getRotationMatrix() << std::endl
-            << "T.translation() = " << T_cur_from_ref_.getPosition();
+  VLOG(5) << "5Pt RANSAC:" << std::endl
+          << "# Iter = " << ransac.iterations_ << std::endl
+          << "# Inliers = " << ransac.inliers_.size() << std::endl
+          << "Model = " << ransac.model_coefficients_ << std::endl
+          << "T.rotation_matrix() = " << T_cur_from_ref_.getRotationMatrix() << std::endl
+          << "T.translation() = " << T_cur_from_ref_.getPosition();
 
   // Triangulate
   if (initialization_utils::triangulateAndInitializePoints(
@@ -324,9 +325,8 @@ InitResult FivePointInit::addFrameBundle(const FrameBundlePtr& frames_cur) {
 }
 
 InitResult OneShotInit::addFrameBundle(const FrameBundlePtr& frames_cur) {
-  if (frames_cur->size() != 1) {
-    throw std::runtime_error("OneShot Initialization doesn't work with Camera Array");
-  }
+  CHECK(frames_cur->size() == 1) << "OneShot Initialization doesn't work with Camera Array";
+
   // Track and detect features.
   trackFeaturesAndCheckDisparity(frames_cur);
 
@@ -387,21 +387,17 @@ StereoInit::StereoInit(const InitializationOptions& init_options,
 }
 
 InitResult StereoInit::addFrameBundle(const FrameBundlePtr& frames) {
-  if (frames->size() != 2u) {
-    throw std::runtime_error("StereoInit: Bundle has not two frames!");
-  }
+  CHECK_EQ(frames->size(), 2u) << "StereoInit: Bundle has not two frames!";
   reset();
   frames_ref_ = frames;
 
-  std::cout << "FRAME 1" << std::endl
-            << frames->at(0)->T_world_cam() << std::endl
-            << "FRAME 2" << std::endl
-            << frames->at(1)->T_cam_world();
+  VLOG(20) << "FRAME 1" << std::endl
+           << frames->at(0)->T_world_cam() << std::endl
+           << "FRAME 2" << std::endl
+           << frames->at(1)->T_cam_world();
 
   stereo_->compute(frames->at(0), frames->at(1));
-  if (frames->at(0)->numLandmarks() < options_.init_min_features) {
-    return InitResult::kFailure;
-  }
+  if (frames->at(0)->numLandmarks() < options_.init_min_features) return InitResult::kFailure;
   return InitResult::kSuccess;
 }
 
@@ -463,7 +459,7 @@ InitResult ArrayInitGeometric::addFrameBundle(const FrameBundlePtr& frames_cur) 
   ransac.probability_ = 0.995;
   ransac.computeModel(1);
 
-  std::cout << "RANSAC:" << std::endl
+  VLOG(5) << "RANSAC:" << std::endl
           << "# Iter = " << ransac.iterations_ << std::endl
           << "# Inliers = " << ransac.inliers_.size() << std::endl
           << "Model = " << ransac.model_coefficients_;
@@ -499,7 +495,7 @@ InitResult ArrayInitGeometric::addFrameBundle(const FrameBundlePtr& frames_cur) 
     //initialization_utils::triangulatePoints(
     //      frame_cur, frame_ref, T_cur_ref,  options_.reproj_error_thresh, points_in_cur);
 
-    std::cout << "-- CAMERA " << frame_cur->cam()->getLabel()
+    VLOG(3) << "-- CAMERA " << frame_cur->cam()->getLabel()
             << ": inliers verified = " << points_in_cur.size();
 
      TODO(cfo)
@@ -684,8 +680,8 @@ bool triangulateAndInitializePoints(const FramePtr& frame_cur, const FramePtr& f
                                           matches_cur_ref, points_in_cur);
 
   if (matches_cur_ref.size() < min_inliers_threshold) {
-    std::cerr << "Init WARNING: " << min_inliers_threshold << " inliers minimum required. "
-              << "Have only " << matches_cur_ref.size();
+    LOG(WARNING) << "Init WARNING: " << min_inliers_threshold << " inliers minimum required. "
+                 << "Have only " << matches_cur_ref.size();
     return false;
   }
 
@@ -736,11 +732,7 @@ void rescaleAndInitializePoints(const FramePtr& frame_cur, const FramePtr& frame
   for (size_t i = 0; i < matches_cur_ref.size(); ++i) {
     depth_vec.push_back(points_in_cur.col(i).norm());
   }
-  if (depth_vec.size() <= 1u) {
-    throw std::runtime_error(
-        "Not enough points to compute median depth for rescaling! "
-        "Maybe the reprojection threshold is too low?");
-  }
+  CHECK_GT(depth_vec.size(), 1u);
   const double scene_depth_median = vk::getMedian(depth_vec);
   const double scale = depth_at_current_frame / scene_depth_median;
 
@@ -755,11 +747,7 @@ void rescaleAndInitializePoints(const FramePtr& frame_cur, const FramePtr& frame
     const Vector3d xyz_in_world = T_world_cur * (points_in_cur.col(i) * scale);
     const int point_id_cur = frame_cur->track_id_vec_(matches_cur_ref[i].first);
     const int point_id_ref = frame_ref->track_id_vec_(matches_cur_ref[i].second);
-    if (point_id_cur != point_id_ref) {
-      throw std::runtime_error(
-          "Point IDs of current and reference frame do not match! "
-          "This should not happen in initialization.");
-    }
+    CHECK_EQ(point_id_cur, point_id_ref);
     PointPtr new_point(new Point(point_id_cur, xyz_in_world));
     frame_cur->landmark_vec_.at(matches_cur_ref[i].first) = new_point;
     frame_ref->landmark_vec_.at(matches_cur_ref[i].second) = new_point;
@@ -768,7 +756,7 @@ void rescaleAndInitializePoints(const FramePtr& frame_cur, const FramePtr& frame
   }
 
   SVO_INFO_STREAM("Init: Triangulated " << matches_cur_ref.size() << " points");
-}  // namespace initialization_utils
+}
 
 void displayFeatureTracks(const FramePtr& frame_cur, const FramePtr& frame_ref) {
   cv::Mat img_rgb(frame_cur->img().size(), CV_8UC3);
@@ -820,7 +808,7 @@ AbstractInitialization::UniquePtr makeInitializer(const InitializationOptions& i
           new ArrayInitOptimization(init_options, tracker_options, detector_options, cams));
       break;
     default:
-      throw std::runtime_error("Initializer type not known.");
+      LOG(FATAL) << "Initializer type not known.";
   }
   return initializer;
 }
@@ -829,9 +817,8 @@ void copyBearingVectors(const Frame& frame_cur, const Frame& frame_ref,
                         const AbstractInitialization::FeatureMatches& matches_cur_ref,
                         AbstractInitialization::BearingVectors* f_cur,
                         AbstractInitialization::BearingVectors* f_ref) {
-  if (!f_cur || !f_ref) {
-    throw std::runtime_error("Bearing vectors pointers must not be null.");
-  }
+  CHECK_NOTNULL(f_cur);
+  CHECK_NOTNULL(f_ref);
   f_cur->reserve(matches_cur_ref.size());
   f_ref->reserve(matches_cur_ref.size());
   for (size_t i = 0; i < matches_cur_ref.size(); ++i) {

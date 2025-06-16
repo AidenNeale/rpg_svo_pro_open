@@ -4,8 +4,11 @@ project(svo_common)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Release)
 
+ADD_DEFINITIONS(-DSVO_USE_ROS)
+
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_gtest REQUIRED)
+find_package(rclcpp REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
 
@@ -39,6 +42,7 @@ target_include_directories(${PROJECT_NAME}
     $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(${PROJECT_NAME}
+  rclcpp
   vikit_cameras
   vikit_common
 )

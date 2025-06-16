@@ -1,3 +1,7 @@
+#include <gflags/gflags.h>
+
+#include <ament_index_cpp/get_package_share_directory.hpp>
+
 // svo
 #include <svo/common/camera.h>
 #include <svo/common/frame.h>
@@ -5,8 +9,6 @@
 #include <svo/direct/feature_detection_utils.h>
 #include <svo/direct/matcher.h>
 #include <svo/test_utils/synthetic_dataset.h>
-
-#include <ament_index_cpp/get_package_share_directory.hpp>
 
 // others
 #include <opencv2/highgui/highgui.hpp>  // imread

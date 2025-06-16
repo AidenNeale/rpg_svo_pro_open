@@ -15,10 +15,10 @@
 #include <arm_neon.h>
 #endif
 
+#include <glog/logging.h>
 #include <svo/direct/patch_utils.h>
 
 #include <Eigen/Dense>
-#include <iostream>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
@@ -35,9 +35,7 @@ bool align1D(
     uint8_t* ref_patch_with_border, uint8_t* ref_patch, const int n_iter,
     const bool affine_est_offset, const bool affine_est_gain, Keypoint* cur_px_estimate,
     double* h_inv) {
-  if (!cur_px_estimate) {
-    throw std::invalid_argument("cur_px_estimate pointer is null");
-  }
+  CHECK_NOTNULL(cur_px_estimate);
 
   constexpr int kHalfPatchSize = 4;
   constexpr int kPatchSize = 2 * kHalfPatchSize;
@@ -157,7 +155,7 @@ bool align1D(
     mean_diff += update[1];
     alpha += update[2];
 
-    std::cout << "It. " << iter << ": \t"
+    VLOG(300) << "It. " << iter << ": \t"
               << "\t u=" << u << ", v=" << v << "\t update = " << update[0] << ", " << update[1]
               << ", " << update[2] << "\t new chi2 = " << new_chi2;
 
@@ -178,7 +176,7 @@ bool align1D(
 #endif
 
     if (update[0] * update[0] < min_update_squared) {
-      std::cout << "converged.";
+      VLOG(300) << "converged.";
       converged = true;
       break;
     }
@@ -733,9 +731,7 @@ bool alignPyr2D(const std::vector<cv::Mat>& img_pyr_ref, const std::vector<cv::M
 
   for (int level = max_level; level >= min_level; --level) {
     const int patch_size = patch_sizes[level];
-    if (patch_size % 8 != 0) {
-      throw std::runtime_error("alignPyr2D is only made for patch sizes multiples of 8!");
-    }
+    CHECK(patch_size % 8 == 0) << ": alignPyr2D is only made for patch sizes multiples of 8!";
     const int halfpatch_size = patch_size / 2;
     const int scale = (1 << level);
     const cv::Mat& img_ref = img_pyr_ref[level];

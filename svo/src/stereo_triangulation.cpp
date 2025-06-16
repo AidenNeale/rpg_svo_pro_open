@@ -24,8 +24,8 @@ StereoTriangulation::StereoTriangulation(const StereoTriangulationOptions& optio
 void StereoTriangulation::compute(const FramePtr& frame0, const FramePtr& frame1) {
   // Check if there is something to do
   if (frame0->numLandmarks() >= options_.triangulate_n_features) {
-    std::cout << "Calling stereo triangulation with sufficient number of features"
-              << " has no effect.";
+    VLOG(5) << "Calling stereo triangulation with sufficient number of features"
+            << " has no effect.";
     return;
   }
 
@@ -121,7 +121,7 @@ void StereoTriangulation::compute(const FramePtr& frame0, const FramePtr& frame1
     }
     if (n_succeded >= n_desired) break;
   }
-  std::cout << "Stereo: Triangulated " << n_succeded << " features," << n_failed << " failed.";
+  VLOG(20) << "Stereo: Triangulated " << n_succeded << " features," << n_failed << " failed.";
 }
 
 }  // namespace svo
