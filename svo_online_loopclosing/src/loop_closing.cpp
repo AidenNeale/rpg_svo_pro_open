@@ -733,23 +733,22 @@ bool LoopClosing::tracePoseGraph(const std::string& path) const {
   trace.precision(15);
   if (!trace) {
     return false;
-  } else {
-    for (int i = 0; i < static_cast<int>(kf_list_.size()); i++) {
-      ceres::MapOfPoses::iterator pose_iter = pgo_->poses_->find(kf_list_[i]->NframeID_);
-      if (pose_iter != pgo_->poses_->end()) {
-        kindr::minimal::Position p = pose_iter->second.p;
-        Quaternion q = Quaternion(pose_iter->second.q);
-        Transformation T_new = Transformation(q, p);
-        Transformation pose_imu = T_new * T_C_B_;
-        trace << kf_list_[i]->timestamp_sec_abs_ << " " << pose_imu.getPosition()(0, 0) << " "
-              << pose_imu.getPosition()(1, 0) << " " << pose_imu.getPosition()(2, 0) << " "
-              << pose_imu.getRotation().x() << " " << pose_imu.getRotation().y() << " "
-              << pose_imu.getRotation().z() << " " << pose_imu.getRotation().w() << std::endl;
-      }
+  }
+  for (int i = 0; i < static_cast<int>(kf_list_.size()); i++) {
+    ceres::MapOfPoses::iterator pose_iter = pgo_->poses_->find(kf_list_[i]->NframeID_);
+    if (pose_iter != pgo_->poses_->end()) {
+      kindr::minimal::Position p = pose_iter->second.p;
+      Quaternion q = Quaternion(pose_iter->second.q);
+      Transformation T_new = Transformation(q, p);
+      Transformation pose_imu = T_new * T_C_B_;
+      trace << kf_list_[i]->timestamp_sec_abs_ << " " << pose_imu.getPosition()(0, 0) << " "
+            << pose_imu.getPosition()(1, 0) << " " << pose_imu.getPosition()(2, 0) << " "
+            << pose_imu.getRotation().x() << " " << pose_imu.getRotation().y() << " "
+            << pose_imu.getRotation().z() << " " << pose_imu.getRotation().w() << std::endl;
     }
-    return true;
   }
   trace.close();
+  return true;
 }
 
 bool LoopClosing::traceTimingData(const std::string& path) const {

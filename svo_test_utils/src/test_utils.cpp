@@ -32,15 +32,6 @@ std::string getTestDataDir() {
 #endif
 }
 
-std::string getTraceDir() {
-#ifdef SVO_USE_ROS
-  std::string default_dir(ros::package::getPath("svo_experiments") + "/results");
-  return vk::getParam<std::string>("svo/trace_dir", default_dir);
-#else
-  return "/tmp";
-#endif
-}
-
 VectorStats computeStats(std::vector<double>& v) {
   VectorStats stats;
   const size_t size = v.size();

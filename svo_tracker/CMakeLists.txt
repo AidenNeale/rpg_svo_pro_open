@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.8s)
 project(svo_tracker)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_BUILD_TYPE Release)
+find_package(svo_cmake REQUIRED)
+include(SvoSetup)
 
 find_package(ament_cmake REQUIRED)
 find_package(Eigen3 REQUIRED)

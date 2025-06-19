@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 project(rpg_common)
 
+find_package(svo_cmake REQUIRED)
+include(SvoSetup)
+
 find_package(ament_cmake REQUIRED)
 
 file(GLOB_RECURSE HEADERS "include/*")

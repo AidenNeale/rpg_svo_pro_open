@@ -10,6 +10,7 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>svo_cmake</depend>
   <depend>svo_vio_common</depend>
   <depend>svo_common</depend>
   <depend>svo</depend>

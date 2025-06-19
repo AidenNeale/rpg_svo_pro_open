@@ -1,12 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(svo)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_BUILD_TYPE Release)
-
-ADD_DEFINITIONS(-DSVO_LOOP_CLOSING)
-ADD_DEFINITIONS(-DSVO_USE_OPENGV)
-ADD_DEFINITIONS(-DSVO_DEPTHFILTER_IN_REPROJECTOR)
+find_package(svo_cmake REQUIRED)
+include(SvoSetup)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_gtest REQUIRED)

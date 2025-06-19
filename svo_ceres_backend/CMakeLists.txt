@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(svo_ceres_backend)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
+find_package(svo_cmake REQUIRED)
+include(SvoSetup)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_gtest REQUIRED)

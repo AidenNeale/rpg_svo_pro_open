@@ -46,11 +46,16 @@ class SvoInterface {
 
   CameraBundlePtr ncam_;
 
+  std::queue<std::pair<cv::Mat, int64_t>> image_queue_;
+  std::mutex image_queue_mutex_;
+  std::condition_variable image_queue_cv_;
+  std::unique_ptr<std::thread> processing_thread_;
+
   // Parameters
   bool set_initial_attitude_from_gravity_ = true;
 
   // System state.
-  bool quit_ = false;
+  std::atomic<bool> quit_ = false;
   bool idle_ = false;
   bool automatic_reinitialization_ = false;
 
@@ -81,7 +86,6 @@ class SvoInterface {
   void subscribeImage();
   void subscribeRemoteKey();
 
-  void imuLoop();
   void monoLoop();
   void stereoLoop();
 };

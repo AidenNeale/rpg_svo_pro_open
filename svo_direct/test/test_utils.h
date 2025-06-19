@@ -132,15 +132,6 @@ inline std::string getTestDataDir() {
 #endif
 }
 
-inline std::string getTraceDir() {
-#if 1
-  std::string default_dir(ament_index_cpp::get_package_share_directory("svo") + "/test/results");
-  return vk::getParam<std::string>("svo/trace_dir", default_dir);
-#else
-  return "/tmp";
-#endif
-}
-
 inline Eigen::Vector3d generateRandomPoint(double max_depth, double min_depth) {
   Eigen::Vector3d raw_point;
   // between -1 ~ +1

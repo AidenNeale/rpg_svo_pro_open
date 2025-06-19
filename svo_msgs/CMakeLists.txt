@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(svo_msgs)
 
-set(CMAKE_CXX_STANDARD 17)
+find_package(svo_cmake REQUIRED)
+include(SvoSetup)
 
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)

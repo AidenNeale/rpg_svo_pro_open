@@ -29,8 +29,8 @@ bool saveMap(const MapPtr& map, const std::string& save_dir, const std::string& 
   // safe frames
   for (const auto& keyval : map->keyframes_) {
     const FramePtr& frame = keyval.second;
-    const Vector3d& t = frame->T_world_cam().getPosition();
-    const Eigen::Quaterniond& q = frame->T_world_cam().getRotation().toImplementation();
+    const Vector3d t = frame->T_world_cam().getPosition();
+    const Eigen::Quaterniond q = frame->T_world_cam().getRotation().toImplementation();
     out << YAML::BeginMap << YAML::Key << "frame_id" << YAML::Value << frame->id() << YAML::Key
         << "cam_name" << YAML::Value << frame->cam()->getLabel() << YAML::Key << "timestamp"
         << YAML::Value << frame->getTimestampNSec() << YAML::Key << "T_world_cam" << YAML::Value
@@ -74,7 +74,7 @@ bool saveMap(const MapPtr& map, const std::string& save_dir, const std::string& 
   out << YAML::EndSeq << YAML::Key << "points" << YAML::Value << YAML::BeginSeq;
 
   // safe points
-  for (const PointPtr point : points) {
+  for (const PointPtr& point : points) {
     out << YAML::BeginMap << YAML::Key << "point_id" << YAML::Value << point->id() << YAML::Key
         << "pos" << YAML::Value << YAML::Flow << YAML::BeginSeq << point->pos_[0] << point->pos_[1]
         << point->pos_[2] << YAML::EndSeq << YAML::EndMap;

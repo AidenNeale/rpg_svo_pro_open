@@ -13,6 +13,7 @@
   <depend>minkindr</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>svo_cmake</depend>
   <depend>svo_common</depend>
 
   <test_depend>gtest</test_depend>

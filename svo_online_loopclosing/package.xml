@@ -15,6 +15,7 @@
   <depend>opengv</depend>
   <depend>DBoW2</depend>
   
+  <depend>svo_cmake</depend>
   <depend>vikit_common</depend>
   <depend>vikit_cameras</depend>
   <depend>svo_common</depend>

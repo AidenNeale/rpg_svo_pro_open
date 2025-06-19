@@ -643,7 +643,7 @@ size_t FrameHandlerBase::projectMapInFrame() {
       (cumul_stats_global_map.n_matches <= 10 ? 0 : cumul_stats_global_map.n_matches);
 
   if (n_total_ftrs < options_.quality_min_fts) {
-    SVO_WARN_STREAM_THROTTLE(1.0, "Not enough matched features: " + std::to_string(n_total_ftrs));
+    SVO_WARN_STREAM("Not enough matched features: " << std::to_string(n_total_ftrs));
   }
 
   return n_total_ftrs;
@@ -856,8 +856,7 @@ void FrameHandlerBase::setRecovery(const bool recovery) {
 void FrameHandlerBase::setTrackingQuality(const size_t num_observations) {
   tracking_quality_ = TrackingQuality::kGood;
   if (num_observations < options_.quality_min_fts) {
-    SVO_WARN_STREAM_THROTTLE(0.5,
-                             "Tracking less than " << options_.quality_min_fts << " features!");
+    SVO_WARN_STREAM("Tracking less than " << options_.quality_min_fts << " features!");
     tracking_quality_ = TrackingQuality::kInsufficient;
   }
   const int feature_drop = static_cast<int>(num_obs_last_) - num_observations;

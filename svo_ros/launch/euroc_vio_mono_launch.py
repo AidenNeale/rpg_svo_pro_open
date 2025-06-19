@@ -20,6 +20,8 @@ def generate_launch_description():
         executable='svo_node',
         name='svo_node',
         output='screen',
+        # prefix=['valgrind --tool=memcheck --leak-check=full --track-origins=yes'],
+        # prefix=['xterm -fs 30 -e gdb -ex run --args'],
         parameters=[
             os.path.join(get_package_share_directory('svo_ros'), 'param', 'vio_mono.yaml'),
             {'calib_file': LaunchConfiguration('calib_file')},
@@ -28,7 +30,7 @@ def generate_launch_description():
             {'imu_topic': '/imu0'},
             {'runlc': True}
         ],
-        arguments=['--ros-args', '--log-level', 'info'],
+         ros_arguments=['--log-level', 'info'],
     )
 
     rviz_node = Node(

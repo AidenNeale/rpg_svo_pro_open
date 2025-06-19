@@ -5,29 +5,28 @@
 
 #pragma once
 
-#include <cstdlib> // for getenv rand
-#include <string>
-#include <ostream>
-#include <fstream>
+#include <svo/common/frame.h>
+#include <vikit/cameras/ncamera.h>
+
 #include <algorithm>
+#include <cstdlib>  // for getenv rand
+#include <fstream>
+#include <ostream>
+#include <string>
 #include <vector>
 
-# include <vikit/cameras/ncamera.h>
-
-#include <svo/common/frame.h>
-
-
-#define SVO_TEST_STREAM(x) {std::cerr<<"\033[0;0m[          ] * "<<x<<"\033[0;0m"<<std::endl; }
+#define SVO_TEST_STREAM(x)                                                    \
+  {                                                                           \
+    std::cerr << "\033[0;0m[          ] * " << x << "\033[0;0m" << std::endl; \
+  }
 
 namespace svo {
 namespace test_utils {
 
 std::string getDatasetDir();
 std::string getTestDataDir();
-std::string getTraceDir();
 
-struct VectorStats
-{
+struct VectorStats {
   double mean;
   double stdev;
   double median;
@@ -37,20 +36,16 @@ struct VectorStats
 
 VectorStats computeStats(std::vector<double>& v);
 
-FrameBundle::Ptr createFrameBundle(
-    CameraPtr cam,
-    const Transformation& T_w_f,
-    const Transformation& T_f_b);
+FrameBundle::Ptr createFrameBundle(CameraPtr cam, const Transformation& T_w_f,
+                                   const Transformation& T_f_b);
 
 Eigen::Vector3d generateRandomPoint(double max_depth, double min_depth);
 
 void calcHist(const std::vector<double>& values, size_t bins, std::vector<size_t>* hist);
 
 // TODO(zzc): auto zoom for the text
-cv::Mat drawHist(
-    const std::vector<size_t>& hist,
-    const std::vector<double>& bounds,
-    int width, int height);
+cv::Mat drawHist(const std::vector<size_t>& hist, const std::vector<double>& bounds, int width,
+                 int height);
 
-} // namespace test_utils
-} // namespace svo
+}  // namespace test_utils
+}  // namespace svo

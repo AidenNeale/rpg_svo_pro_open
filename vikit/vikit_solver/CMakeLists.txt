@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.8)
 project(vikit_solver)
 
+find_package(svo_cmake REQUIRED)
+include(SvoSetup)
+
 find_package(ament_cmake REQUIRED)
 
-SET(CMAKE_BUILD_TYPE Release)
-set(CMAKE_CXX_STANDARD 17)
 
 
 #############

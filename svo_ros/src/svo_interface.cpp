@@ -113,13 +113,10 @@ SvoInterface::SvoInterface(const PipelineType& pipeline_type, std::shared_ptr<rc
   }
 
   svo_->start();
+  processing_thread_ = std::make_unique<std::thread>(&SvoInterface::monoLoop, this);
 }
 
-SvoInterface::~SvoInterface() {
-  if (imu_thread_) imu_thread_->join();
-  if (image_thread_) image_thread_->join();
-  VLOG(1) << "Destructed SVO.";
-}
+SvoInterface::~SvoInterface() { VLOG(1) << "Destructed SVO."; }
 
 void SvoInterface::processImageBundle(const std::vector<cv::Mat>& images,
                                       const int64_t timestamp_nanoseconds) {
@@ -271,27 +268,17 @@ void SvoInterface::monoCallback(const sensor_msgs::msg::Image::ConstSharedPtr& m
     image = cv_bridge::toCvCopy(msg)->image;
   } catch (cv_bridge::Exception& e) {
     RCLCPP_ERROR_STREAM(rclcpp::get_logger("svo_interface"), "cv_bridge exception: " << e.what());
-  }
-
-  std::vector<cv::Mat> images;
-  images.push_back(image.clone());
-
-  auto timestamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
-
-  if (!setImuPrior(timestamp_ns)) {
-    VLOG(3) << "Could not align gravity! Attempting again in next iteration.";
     return;
   }
 
-  imageCallbackPreprocessing(timestamp_ns);
+  auto timestamp_ns = rclcpp::Time(msg->header.stamp).nanoseconds();
 
-  processImageBundle(images, timestamp_ns);
-
-  publishResults(images, timestamp_ns);
-
-  if (svo_->stage() == Stage::kPaused && automatic_reinitialization_) svo_->start();
-
-  imageCallbackPostprocessing();
+  // Push to a thread-safe queue for processing
+  {
+    std::lock_guard<std::mutex> lock(image_queue_mutex_);
+    image_queue_.emplace(image.clone(), timestamp_ns);
+  }
+  image_queue_cv_.notify_one();
 }
 
 void SvoInterface::stereoCallback(const sensor_msgs::msg::Image::ConstSharedPtr& msg0,
@@ -328,10 +315,11 @@ void SvoInterface::imuCallback(const sensor_msgs::msg::Imu::ConstSharedPtr& msg)
   const Eigen::Vector3d lin_acc_imu(msg->linear_acceleration.x, msg->linear_acceleration.y,
                                     msg->linear_acceleration.z);
   const ImuMeasurement m(rclcpp::Time(msg->header.stamp).seconds(), omega_imu, lin_acc_imu);
-  if (imu_handler_)
+  if (imu_handler_) {
     imu_handler_->addImuMeasurement(m);
-  else
+  } else {
     SVO_ERROR_STREAM("SvoNode has no ImuHandler");
+  }
 }
 
 void SvoInterface::inputKeyCallback(const std_msgs::msg::String::ConstSharedPtr& key_input) {
@@ -365,15 +353,21 @@ void SvoInterface::inputKeyCallback(const std_msgs::msg::String::ConstSharedPtr&
 }
 
 void SvoInterface::subscribeImu() {
-  imu_thread_ = std::unique_ptr<std::thread>(new std::thread(&SvoInterface::imuLoop, this));
+  std::string imu_topic = vk::param<std::string>(nh_, "imu_topic", "imu");
+  sub_imu_ = nh_->create_subscription<sensor_msgs::msg::Imu>(
+      imu_topic, 100, std::bind(&svo::SvoInterface::imuCallback, this, std::placeholders::_1));
   sleep(3);
 }
 
 void SvoInterface::subscribeImage() {
-  if (pipeline_type_ == PipelineType::kMono)
-    image_thread_ = std::unique_ptr<std::thread>(new std::thread(&SvoInterface::monoLoop, this));
-  else if (pipeline_type_ == PipelineType::kStereo)
+  image_transport::ImageTransport it(nh_);
+  if (pipeline_type_ == PipelineType::kMono) {
+    std::string image_topic = vk::param<std::string>(nh_, "cam0_topic", "camera/image_raw");
+    it_sub_ = std::make_shared<image_transport::Subscriber>(
+        it.subscribe(image_topic, 5, &svo::SvoInterface::monoCallback, this));
+  } else if (pipeline_type_ == PipelineType::kStereo) {
     image_thread_ = std::unique_ptr<std::thread>(new std::thread(&SvoInterface::stereoLoop, this));
+  }
 }
 
 void SvoInterface::subscribeRemoteKey() {
@@ -383,39 +377,35 @@ void SvoInterface::subscribeRemoteKey() {
       std::bind(&svo::SvoInterface::inputKeyCallback, this, std::placeholders::_1));
 }
 
-void SvoInterface::imuLoop() {
-  SVO_INFO_STREAM("SvoNode: Started IMU loop.");
-  std::string imu_topic = vk::param<std::string>(nh_, "imu_topic", "imu");
-  sub_imu_ = nh_->create_subscription<sensor_msgs::msg::Imu>(
-      imu_topic, 10, std::bind(&svo::SvoInterface::imuCallback, this, std::placeholders::_1));
-  // auto nh = std::make_shared<rclcpp::Node>("imu_node");
-  // std::string imu_topic = vk::param<std::string>(nh_, "imu_topic", "imu");
-  // sub_imu_ = nh->create_subscription<sensor_msgs::msg::Imu>(
-  //     imu_topic, 10, std::bind(&svo::SvoInterface::imuCallback, this, std::placeholders::_1));
-  // while (rclcpp::ok() && !quit_) {
-  //   rclcpp::spin_some(nh);
-  //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  // }
-}
-
 void SvoInterface::monoLoop() {
   SVO_INFO_STREAM("SvoNode: Started Image loop.");
-  image_transport::ImageTransport it(nh_);
-  std::string image_topic = vk::param<std::string>(nh_, "cam0_topic", "camera/image_raw");
-  it_sub_ = std::make_shared<image_transport::Subscriber>(
-      it.subscribe(image_topic, 5, &svo::SvoInterface::monoCallback, this));
+  while (rclcpp::ok() && !quit_) {
+    std::unique_lock<std::mutex> lock(image_queue_mutex_);
+    image_queue_cv_.wait(lock, [this] { return !image_queue_.empty() || quit_; });
+    if (quit_) {
+      break;
+    }
 
-  // auto nh = std::make_shared<rclcpp::Node>("mono_node");
+    auto [image, timestamp_ns] = image_queue_.front();
+    image_queue_.pop();
+    lock.unlock();
 
-  // image_transport::ImageTransport it(nh);
-  // std::string image_topic = vk::param<std::string>(nh_, "cam0_topic", "camera/image_raw");
-  // image_transport::Subscriber it_sub =
-  //     it.subscribe(image_topic, 5, &svo::SvoInterface::monoCallback, this);
+    if (!setImuPrior(timestamp_ns)) {
+      VLOG(3) << "Could not align gravity! Attempting again in next iteration.";
+      continue;
+    }
 
-  // while (rclcpp::ok() && !quit_) {
-  //   rclcpp::spin_some(nh);
-  //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  // }
+    std::vector<cv::Mat> images{image};
+    imageCallbackPreprocessing(timestamp_ns);
+    processImageBundle(images, timestamp_ns);
+    publishResults(images, timestamp_ns);
+
+    if (svo_->stage() == Stage::kPaused && automatic_reinitialization_) {
+      svo_->start();
+    }
+
+    imageCallbackPostprocessing();
+  }
 }
 
 void SvoInterface::stereoLoop() {

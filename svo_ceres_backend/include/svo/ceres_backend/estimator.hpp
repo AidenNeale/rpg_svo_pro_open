@@ -112,13 +112,13 @@ struct MarginalizationTiming {
   std::map<std::string, double> named_timing_;
 
   MarginalizationTiming() {
-    for (const auto k : names_) {
+    for (const auto& k : names_) {
       named_timing_.emplace(std::make_pair(k, 0.0));
     }
   }
 
   inline void reset() {
-    for (const auto k : names_) {
+    for (const auto& k : names_) {
       named_timing_[k] = 0.0;
     }
   }

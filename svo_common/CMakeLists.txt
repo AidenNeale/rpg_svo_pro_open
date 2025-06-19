@@ -1,10 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(svo_common)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_BUILD_TYPE Release)
-
-ADD_DEFINITIONS(-DSVO_USE_ROS)
+find_package(svo_cmake REQUIRED)
+include(SvoSetup)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_gtest REQUIRED)
@@ -82,7 +80,7 @@ install(DIRECTORY include/
   DESTINATION include/
 )
 
-ament_export_dependencies(vikit_cameras vikit_common OpenCV)
+ament_export_dependencies(rclcpp vikit_cameras vikit_common OpenCV)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_include_directories(include)
 ament_package()
