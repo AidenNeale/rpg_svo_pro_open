@@ -1,5 +1,5 @@
-# SET(CMAKE_BUILD_TYPE Release) # Release, RelWithDebInfo
-SET(CMAKE_BUILD_TYPE Debug) # Release, RelWithDebInfo
+SET(CMAKE_BUILD_TYPE Release) # Release, RelWithDebInfo
+# SET(CMAKE_BUILD_TYPE Debug) # Release, RelWithDebInfo
 SET(CMAKE_VERBOSE_MAKEFILE OFF)
 set(CMAKE_CXX_STANDARD 17)
 
