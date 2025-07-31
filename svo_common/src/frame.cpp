@@ -51,7 +51,10 @@ void Frame::initFrame(const cv::Mat& img, size_t n_pyr_levels) {
   }
   if (img.cols != static_cast<int>(cam_->imageWidth()) ||
       img.rows != static_cast<int>(cam_->imageHeight())) {
-    throw std::runtime_error("Image size does not match camera model.");
+    throw std::runtime_error("Image size does not match camera model. Expected size: " +
+                             std::to_string(cam_->imageWidth()) + "x" +
+                             std::to_string(cam_->imageHeight()) +
+                             ", got: " + std::to_string(img.cols) + "x" + std::to_string(img.rows));
   }
 
   if (img.type() == CV_8UC1) {

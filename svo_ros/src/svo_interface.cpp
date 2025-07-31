@@ -354,8 +354,11 @@ void SvoInterface::inputKeyCallback(const std_msgs::msg::String::ConstSharedPtr&
 
 void SvoInterface::subscribeImu() {
   std::string imu_topic = vk::param<std::string>(nh_, "imu_topic", "imu");
+  // Create a custom QoS profile that matches RealSense's
+  auto qos = rclcpp::QoS(100).best_effort().durability_volatile();
+
   sub_imu_ = nh_->create_subscription<sensor_msgs::msg::Imu>(
-      imu_topic, 100, std::bind(&svo::SvoInterface::imuCallback, this, std::placeholders::_1));
+      imu_topic, qos, std::bind(&svo::SvoInterface::imuCallback, this, std::placeholders::_1));
   sleep(3);
 }
 
